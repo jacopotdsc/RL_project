@@ -4,10 +4,14 @@ import torch.nn as nn
 import numpy as np
 import random
 import time
+import mujoco_py
 
 from my_network import *
 
-
+###
+# from baselines.common.cmd_util import mujoco_arg_parser, make_mujoco_env
+# "RoboSumo-Ant-vs-Ant-v0"
+#from gym_extensions.continuous import mujoco
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
@@ -32,15 +36,15 @@ class Agent(nn.Module):
 
         self.render = None #'human' # None
 
-        self.env1_id = 'LunarLander-v2'
+        self.env1_id = 'HalfCheetah-v2' # 'LunarLander-v2'
         self.env1 = gym.make(self.env1_id, render_mode=self.render) # gym.make('HalfCheetah-v2')
         self.env1_n_action = 6 # self.env1.action_space.n
 
-        self.env2_id = 'CarRacing-v2'
+        self.env2_id = 'CarRacing-v2'# 'Humanoid-v2' #'HumanoidSmallLeg-v0'
         self.env2 = gym.make(self.env2_id, continuous=False, render_mode=self.render) # gym.make('HumanoidSmallLeg-v0')   
         self.env2_n_action = 17 # self.env2.action_space.n
 
-        self.env3_id = 'Taxi-v3'
+        self.env3_id = 'Taxi-v3' # 'RoboSumo-Ant-vs-Ant-v0'
         self.env3 = gym.make(self.env3_id, render_mode=self.render)# gym.make('RoboschoolHumanoid-v1')   
         self.env3_n_action = 23 #  self.env3.action_space.n
 
