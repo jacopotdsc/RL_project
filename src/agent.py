@@ -166,7 +166,7 @@ class Agent(nn.Module):
                 env_reward[env_id] = 0
     
 
-            env_index  = random.randint(0,2)      # used for switch
+            env_index  = random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
             done_counter = 0    # use to terminate episode
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
@@ -195,6 +195,7 @@ class Agent(nn.Module):
                 env_step[actual_id_env] += 1
 
 
+                # terminate condition
                 if env_step[actual_id_env] >= 200: done = True
 
                 # plot statstics
@@ -212,9 +213,10 @@ class Agent(nn.Module):
                     mean_rewards = np.mean(self.training_reward[-window:])
                     mean_loss    = np.mean(self.training_loss[-window:])
                     
-                    print("\nEpisode {:d}/{:d}, id: {}, Step: {:d}".format(e, max_epochs, actual_id_env, env_step[actual_id_env]))
-                    print("Mean Rewards {:.2f},  Episode reward = {:.2f},  mean loss = {:.3f}".format(mean_rewards, env_reward[actual_id_env], mean_loss ) )
-                    print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
+                    #print("\nEpisode {:d}/{:d}, id: {}, Step: {:d}".format(e, max_epochs, actual_id_env, env_step[actual_id_env]))
+                    #print("Mean Rewards {:.2f},  Episode reward = {:.2f},  mean loss = {:.3f}".format(mean_rewards, env_reward[actual_id_env], mean_loss ) )
+                    #print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
+                    print(f"Enviroment done: {actual_id_env}")
 
                     self.epsilon *= self.epsilon_decay
 
@@ -237,6 +239,17 @@ class Agent(nn.Module):
                         break
 
            
+            print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}]".format( e,
+                                                                    max_epochs,
+                                                                    ', '.join( map(str,list(self.env_array.keys()) )), 
+                                                                    ', '.join( map(str,list(env_step.values()) ))
+                                                                    ))
+            print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = {:.3f}".format(mean_rewards, 
+                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
+                                                                                              mean_loss ) 
+                                                                                              )
+            print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
+
             #plot_training_rewards(self)
             #plot_training_loss(self)
             #plot_episode_reward(self)
