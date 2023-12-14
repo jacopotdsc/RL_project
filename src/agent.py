@@ -42,6 +42,7 @@ class Agent(nn.Module):
         self.env3 = gym.make('CarRacing-v2', continuous=False)# gym.make('RoboschoolHumanoid-v1')   
         self.env3_n_action = self.env1.action_space.n
 
+        # it contain  actual state for each enviroment
         self.env_array = { self.env1_id: self.env1, 
                            self.env2_id: self.env2, 
                            self.env3_id: self.env3 }
@@ -99,12 +100,37 @@ class Agent(nn.Module):
 
         return action
 
+    def swtich_enviroment(self, actual_id_env, env_ids, env_done, env_index):
+
+        # support variable: env_index, env_ids, env_done
+        # changed: actual_id_env, actual_env
+
+        # actual_id_env: actual id of the enviroment
+        # env_ids: array with all keys ( names ) of enviroment
+        # env_states: actual state of the actual enviroment
+        # env_done: dictionary which contain done-boolean
+        # env_index: general counter
+
+        switched = False
+
+        while not switched:
+
+            env_index += 1
+            if env_done[ actual_id_env ] == False:
+
+                switched = True
+                actual_id_env = env_ids[ env_index % len(env_ids) ]    # env_ids has key for dictionary
+                actual_env = self.env_array[ actual_id_env ]   # picking the state of the enviroment
+
+        return actual_env, actual_id_env, env_index
+
     # training loop
     def train(self):
        
        
-        max_epochs = 400
+        max_epochs = 200
         switch_env_frequency = 50
+        window = 50 
 
         old_mean_reward = -999
         start_time = time.perf_counter()
@@ -112,42 +138,64 @@ class Agent(nn.Module):
         for e in range(max_epochs):
 
             # create dictionary for switching easier between states of enviroments
-            env_states = {}
+            env_states = {}     # contain state to pass when callicng act
+            env_step   = {}     # counter for switch
+            env_done   = {}     # contain "done" enviroment
+            env_reward = {}     # counter for reward
             for env_id in self.env_array.keys():
-                init_state, _ = self.env_array[env_id].reset()
-                env_states[env_id] = init_state
-                
 
-            steps  = 0
-            window = 50
-            total_reward = 0
-            done = False                
+                init_state, _ = self.env_array[env_id].reset()
+
+                env_states[env_id] = init_state
+                env_done[env_id]   = False
+                env_step[env_id]   = 0
+                env_reward[env_id] = 0
+    
+
+            env_ids       = self.env_array.keys()  # contain id of all enviroment
+            actual_id_env = env_ids[env_ids]       # contain id of the actual enviroment
+            actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
+
+            env_index  = 0      # used for switch
+            done_counter = 0    # use to terminate episode
 
             while True:
 
-                action = self.act(state)
+                if env_step[actual_id_env] % switch_env_frequency == 0:
+                    actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
 
-                reward = 0
+                state = env_states[ actual_id_env ]
+                action = self.act(state, actual_env)
                 
-                state, r, terminated, truncated, _ = env.step(action)
+                next_state, reward, terminated, truncated, _ = actual_env.step(action)
+                env_states[ actual_id_env ] = next_state
                 done = terminated or truncated  # truncated if fail to stand up -> penalize!
-
-                reward += r
                 
-                total_reward += reward
-                steps += 1
+
+                
+                env_reward[actual_id_env] += reward
+                env_step[actual_id_env] += 1
 
                 # plot statstics
                 if done:
+
+                    done_counter += 1
+                    env_done[actual_id_env] = True
                 
+                    total_reward = np.array(env_reward.values).sum()
+                    total_steps = np.array(env_step.values).sum()
+
                     self.training_reward.append(total_reward)
                     self.reward_episode.append(total_reward)
 
                     mean_rewards = np.mean(self.training_reward[-window:])
                     mean_loss    = np.mean(self.training_loss[-window:])
                     
-                    print("\nEpisode {:d}/{:d} Step: {:d} Mean Rewards {:.2f}  Episode reward = {:.2f}  lr: {:.5f} e: {:.3f} mean loss = {:.3f}\t\t".format(
-                                e, max_epochs,steps, mean_rewards, total_reward,  self.learning_rate, self.epsilon, mean_loss))
+                    print("\nEpisode {:d}/{:d} Step: {:d} Mean Rewards {:.2f}  Episode reward = {:.2f}  mean loss = {:.3f}\t\t".format(
+                                e, max_epochs, total_steps, mean_rewards, total_reward, mean_loss))
+                    
+                    print("lr: {:.5f} e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
+
 
 
                     self.epsilon *= self.epsilon_decay
@@ -167,7 +215,8 @@ class Agent(nn.Module):
                         old_mean_reward = actual_mean_reward
                         self.save('end_episode.pt')
 
-                    break
+                    if done_counter >= len(self.env_array):
+                        break
 
            
             plot_training_rewards(self)
