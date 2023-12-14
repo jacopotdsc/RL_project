@@ -25,9 +25,9 @@ class Net(nn.Module):
         self.fl1 = nn.Linear(5292, 216, bias=bias) 
 
         # output layers: one for each enviroment
-        self.fl_half_cheetah = nn.Linear(216, self.env1_outputs, bias=bias)
-        self.fl_human_walk   = nn.Linear(216, self.env2_outputs, bias=bias)
-        self.fl_multi_agent  = nn.Linear(216, self.env3_outputs, bias=bias)
+        self.fl_half_cheetah = nn.Linear(in_features=216, out_features=self.env1_outputs, bias=bias)
+        self.fl_human_walk   = nn.Linear(in_features=216, out_features=self.env2_outputs, bias=bias)
+        self.fl_multi_agent  = nn.Linear(in_features=216, out_features=self.env3_outputs, bias=bias)
 
 
         # optimizer -> check how it work values
@@ -84,13 +84,13 @@ def plot_training_rewards(agent):
         plt.ylabel('Reward')
         plt.xlabel('Episods')
         #plt.show()
-        plt.savefig('mean_training_rewards.png')
+        plt.savefig('plot/mean_training_rewards.png')
         plt.clf()
 
 def plot_training_loss(agent):
         cumulative_mean = np.cumsum(agent.training_loss) / len(agent.training_loss)
         plt.plot(cumulative_mean)
-        plt.title('Mean training loss')
+        plt.title('plot/Mean training loss')
         plt.ylabel('loss')
         plt.xlabel('timestep')
         #plt.show()
@@ -103,5 +103,5 @@ def plot_episode_reward(agent):
         plt.ylabel('rewards')
         plt.xlabel('timestep')
         #plt.show()
-        plt.savefig('episode_rewards.png')
+        plt.savefig('plot/episode_rewards.png')
         plt.clf()
