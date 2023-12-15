@@ -36,7 +36,7 @@ class Net(nn.Module):
         self.input_env3 = nn.Linear(in_features=self.env1_input, out_features=30, bias=bias)
 
         # hidden layers
-        self.cn1 = nn.Conv2d(in_channels=self.n_inputs, out_channels=6, kernel_size=7, stride=1, bias=bias)
+        self.cn1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=7, stride=1, bias=bias)
         self.cn2 = nn.Conv2d(in_channels=6, out_channels=12, kernel_size=4, stride=1, bias=bias)                     
         self.fl1 = nn.Linear(5292, 216, bias=bias) 
 

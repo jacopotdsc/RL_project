@@ -35,31 +35,31 @@ class Agent(nn.Module):
         self.evaluation_env = env # used during evaluation: it contian the id of the enviroment ( maybe do a gym.make(env) )
 
         self.render = None #'human' # None
+        self.action_type_discrete   = 'Discrete'
+        self.action_type_continuous = 'Continuous'
 
         self.env1_id     = 'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
         self.env1        = gym.make(self.env1_id, render_mode=self.render)  # gym.make('HalfCheetah-v2')
         obs1_shape       = self.env1.observation_space.shape
         self.env1_input  = obs1_shape[0] if len(obs1_shape) == 1 else obs1_shape[0]*obs1_shape[1]
         self.env1_action = self.env1.action_space.n if type(self.env1.action_space)== gym.spaces.discrete.Discrete else self.env1.action_space.shape[0]
-
-        print(f"qui -> {self.env1_input}")
+        self.env1_type_a = self.action_type_discrete if type(self.env1.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
+        
         
         self.env2_id     = 'BipedalWalker-v3'                               # https://www.gymlibrary.dev/environments/box2d/bipedal_walker/
         self.env2        = gym.make(self.env2_id, render_mode=self.render)  # gym.make('HumanoidSmallLeg-v0')  
         obs2_shape       = self.env2.observation_space.shape
         self.env2_input  = obs2_shape[0] if len(obs2_shape) == 1 else obs2_shape[0]*obs2_shape[1]
         self.env2_action = self.env2.action_space.n if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.env2.action_space.shape[0]
+        self.env2_type_a = self.action_type_discrete if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
         
-        print(f"qui -> {self.env2_input}")
         
         self.env3_id     = 'Acrobot-v1'                                     # https://www.gymlibrary.dev/environments/classic_control/acrobot/
         self.env3        = gym.make(self.env3_id, render_mode=self.render)  # gym.make('RoboschoolHumanoid-v1')   
         obs3_shape       = self.env3.observation_space.shape
         self.env3_input  = obs3_shape[0] if len(obs3_shape) == 1 else obs3_shape[0]*obs3_shape[1]
         self.env3_action = self.env3.action_space.n if type(self.env3.action_space)== gym.spaces.discrete.Discrete else self.env3.action_space.shape[0]
-
-        print(f"qui -> {self.env3_input}")
-        
+        self.env3_type_a = self.action_type_discrete if type(self.env3.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
 
         # it contain  actual state for each enviroment
         self.env_array = { self.env1_id: self.env1, 
@@ -82,6 +82,9 @@ class Agent(nn.Module):
         self.reward_episode  = []
 
         print(self.model)
+        print(f"{self.env1_id}:\t input:{self.env1_input}, output:{self.env1_action}")
+        print(f"{self.env2_id}:\t input:{self.env2_input}, output:{self.env2_action}")
+        print(f"{self.env3_id}:\t input:{self.env3_input}, output:{self.env3_action}")
         print(f"Device: {self.device}")
 
 
@@ -108,12 +111,23 @@ class Agent(nn.Module):
 
         #print(f"id: {env_id}")
         
-        if env_id == 'LunarLander-v2':
-            action =  random.randint(0,3)
-        elif env_id == 'CarRacing-v2':
-            action = random.randint(0,4)
-        elif env_id == 'Taxi-v3':
-            action = random.randint(0,5)
+        if env_id == self.env1_id:
+            if self.env1_type_a == self.action_type_discrete:
+                action = random.randint(0, self.env1_action -1 )
+            else:
+                action = np.random.uniform(-1, 1, self.env1_action)
+
+        elif env_id == self.env2_id:
+            if self.env2_type_a == self.action_type_discrete:
+                action = random.randint(0, self.env2_action -1 )
+            else:
+                action = np.random.uniform(-1, 1, self.env2_action)
+
+        elif env_id == self.env3_id:
+            if self.env3_type_a == self.action_type_discrete:
+                action = random.randint(0, self.env3_action -1 )
+            else:
+                action = np.random.uniform(-1, 1, self.env3_action)
 
         '''
         if np.random.rand() > self.epsilon:
@@ -161,7 +175,7 @@ class Agent(nn.Module):
        
        
         max_epochs = 10
-        switch_env_frequency = 10
+        switch_env_frequency = 20
         window = 50 
 
         old_mean_reward = -999
@@ -185,6 +199,7 @@ class Agent(nn.Module):
 
             env_index  = random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
             done_counter = 0    # use to terminate episode
+            switch_counter = 0
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
             actual_id_env = env_ids[env_index]       # contain id of the actual enviroment
@@ -197,6 +212,7 @@ class Agent(nn.Module):
                 if env_step[actual_id_env] % switch_env_frequency == 0 or done == True:
                     #print(f"old: {actual_id_env}")
                     actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
+                    switch_counter += 1
                     #print(f"new: {actual_id_env}\n")
 
                 state = env_states[ actual_id_env ]
@@ -256,10 +272,11 @@ class Agent(nn.Module):
                         break
 
            
-            print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}]".format( e,
+            print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}], Switch: {}".format( e,
                                                                     max_epochs,
                                                                     ', '.join( map(str,list(self.env_array.keys()) )), 
-                                                                    ', '.join( map(str,list(env_step.values()) ))
+                                                                    ', '.join( map(str,list(env_step.values()) )),
+                                                                    switch_counter
                                                                     ))
             print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = {:.3f}".format(mean_rewards, 
                                                                                               ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
