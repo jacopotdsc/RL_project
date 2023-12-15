@@ -4,7 +4,7 @@ import torch.nn as nn
 import numpy as np
 import random
 import time
-import mujoco_py
+#import mujoco_py
 
 from my_network import *
 
@@ -36,17 +36,30 @@ class Agent(nn.Module):
 
         self.render = None #'human' # None
 
-        self.env1_id = 'HalfCheetah-v2' # 'LunarLander-v2'
-        self.env1 = gym.make(self.env1_id, render_mode=self.render) # gym.make('HalfCheetah-v2')
-        self.env1_n_action = 6 # self.env1.action_space.n
+        self.env1_id     = 'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
+        self.env1        = gym.make(self.env1_id, render_mode=self.render)  # gym.make('HalfCheetah-v2')
+        obs1_shape       = self.env1.observation_space.shape
+        self.env1_input  = obs1_shape[0] if len(obs1_shape) == 1 else obs1_shape[0]*obs1_shape[1]
+        self.env1_action = self.env1.action_space.n if type(self.env1.action_space)== gym.spaces.discrete.Discrete else self.env1.action_space.shape[0]
 
-        self.env2_id = 'CarRacing-v2'# 'Humanoid-v2' #'HumanoidSmallLeg-v0'
-        self.env2 = gym.make(self.env2_id, continuous=False, render_mode=self.render) # gym.make('HumanoidSmallLeg-v0')   
-        self.env2_n_action = 17 # self.env2.action_space.n
+        print(f"qui -> {self.env1_input}")
+        
+        self.env2_id     = 'BipedalWalker-v3'                               # https://www.gymlibrary.dev/environments/box2d/bipedal_walker/
+        self.env2        = gym.make(self.env2_id, render_mode=self.render)  # gym.make('HumanoidSmallLeg-v0')  
+        obs2_shape       = self.env2.observation_space.shape
+        self.env2_input  = obs2_shape[0] if len(obs2_shape) == 1 else obs2_shape[0]*obs2_shape[1]
+        self.env2_action = self.env2.action_space.n if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.env2.action_space.shape[0]
+        
+        print(f"qui -> {self.env2_input}")
+        
+        self.env3_id     = 'Acrobot-v1'                                     # https://www.gymlibrary.dev/environments/classic_control/acrobot/
+        self.env3        = gym.make(self.env3_id, render_mode=self.render)  # gym.make('RoboschoolHumanoid-v1')   
+        obs3_shape       = self.env3.observation_space.shape
+        self.env3_input  = obs3_shape[0] if len(obs3_shape) == 1 else obs3_shape[0]*obs3_shape[1]
+        self.env3_action = self.env3.action_space.n if type(self.env3.action_space)== gym.spaces.discrete.Discrete else self.env3.action_space.shape[0]
 
-        self.env3_id = 'Taxi-v3' # 'RoboSumo-Ant-vs-Ant-v0'
-        self.env3 = gym.make(self.env3_id, render_mode=self.render)# gym.make('RoboschoolHumanoid-v1')   
-        self.env3_n_action = 23 #  self.env3.action_space.n
+        print(f"qui -> {self.env3_input}")
+        
 
         # it contain  actual state for each enviroment
         self.env_array = { self.env1_id: self.env1, 
@@ -54,14 +67,14 @@ class Agent(nn.Module):
                            self.env3_id: self.env3 }
 
 
+
         # Network
         self.input = 256 # find a standar dimension. probably each enviroment has it's input's shape
         
-        self.model           = Net(n_inputs=3, 
-                                   env1_outputs=self.env1_n_action, 
-                                   env2_outputs=self.env2_n_action, 
-                                   env3_outputs=self.env3_n_action, 
-                                   learning_rate=self.learning_rate).to(self.device) 
+        self.model           = Net( env1_id=self.env1_id, env1_input=3, env1_outputs=self.env1_action, 
+                                    env2_id=self.env1_id, env2_input=3, env2_outputs=self.env2_action, 
+                                    env3_id=self.env1_id, env3_input=3, env3_outputs=self.env3_action, 
+                                    learning_rate=self.learning_rate).to(self.device) 
         
         # for plotting
         self.training_reward = []
