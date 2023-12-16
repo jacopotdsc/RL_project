@@ -7,6 +7,8 @@ import time
 #import mujoco_py
 
 from my_network import *
+from calculate_loss_function import *
+
 
 ###
 # from baselines.common.cmd_util import mujoco_arg_parser, make_mujoco_env
@@ -71,9 +73,9 @@ class Agent(nn.Module):
         # Network
         self.input = 256 # find a standar dimension. probably each enviroment has it's input's shape
         
-        self.model           = Net( env1_id=self.env1_id, env1_input=3, env1_outputs=self.env1_action, 
-                                    env2_id=self.env1_id, env2_input=3, env2_outputs=self.env2_action, 
-                                    env3_id=self.env1_id, env3_input=3, env3_outputs=self.env3_action, 
+        self.model           = Net( env1_id=self.env1_id, env1_input=8, env1_outputs=4, 
+                                    env2_id=self.env1_id, env2_input=24, env2_outputs=2, 
+                                    env3_id=self.env1_id, env3_input=6, env3_outputs=3, 
                                     learning_rate=self.learning_rate).to(self.device) 
         
         # for plotting
@@ -89,20 +91,19 @@ class Agent(nn.Module):
 
 
     # TODO: return action index -> used in evaluation
-    def forward(self, x):
+    def forward(self, x, env_id):
         n_actions = self.evaluation_env.action_space.n
 
-        if n_actions == 6:
-            half_cheetah_id = self.model.half_cheetah_id
-            action = self.model.forward(x, half_cheetah_id)
+        model_input = {'state':x, 'env_id':env_id}
 
-        elif n_actions == 17:
-            human_walk_id = self.model.human_walk_id
-            action = self.model.forward(x, human_walk_id)
+        if self.env1_id == env_id:
+            action = self.model.forward(model_input)
+
+        elif self.env1_id == env_id:
+            action = self.model.forward(model_input)
 
         else:
-            multi_agent_id = self.model.multi_agent_id 
-            action = self.model.forward(x, multi_agent_id)
+            action = self.model.forward(model_input)
 
         return action
 
@@ -181,6 +182,12 @@ class Agent(nn.Module):
         old_mean_reward = -999
         start_time = time.perf_counter()
 
+        # for CASC loss i need distribution at iteration 'k', 'k-1', 'k+1'
+        policy_distribution_env1 = {'actual':None, 'old-1':None, 'old-2':None}
+        policy_distribution_env2 = {'actual':None, 'old-1':None, 'old-2':None}
+        policy_distribution_env3 = {'actual':None, 'old-1':None, 'old-2':None}
+        self.beta = 0.3
+
         for e in range(max_epochs):
 
             # create dictionary for switching easier between states of enviroments
@@ -216,8 +223,8 @@ class Agent(nn.Module):
                     #print(f"new: {actual_id_env}\n")
 
                 state = env_states[ actual_id_env ]
-                action = self.act(state, actual_id_env)
-                #action = 0
+                action = self.act(state, actual_id_env) # TODO: implement epsilon-greedy policy
+                
                 
                 next_state, reward, terminated, truncated, _ = actual_env.step(action)
                 env_states[ actual_id_env ] = next_state

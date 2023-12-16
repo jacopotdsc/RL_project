@@ -26,6 +26,7 @@ class Net(nn.Module):
 
         # activation function
         self.relu    = nn.ReLU()
+        self.tan     = nn.Tanh()
         self.pool    = nn.MaxPool2d(kernel_size=2)
         self.flatten = nn.Flatten()
         self.softm   = nn.Softmax(dim=-1)
@@ -55,8 +56,8 @@ class Net(nn.Module):
     # return the action's probabilities
     def forward(self, x):
         
-        x = input[0]
-        env_id = input[1]
+        x = x['state']
+        env_id = x['env_id']
 
         x = self.q_val(x, env_id)
         x = self.softm(x)
@@ -96,6 +97,7 @@ class Net(nn.Module):
 
         elif env_id == self.env2_id:
             x = self.fl_out_env2(x)
+            x = self.tan(x)
 
         elif env_id == self.env3_id :
             x = self.fl_out_env3(x)
