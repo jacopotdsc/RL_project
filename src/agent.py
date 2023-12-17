@@ -26,7 +26,7 @@ class Agent(nn.Module):
 
         # hyperparameters
         self.gamma           = gamma
-        self.epsilon         = epsilon
+        self.epsilon         = 0#epsilon
         self.epsilon_min     = epsilon_min
         self.epsilon_decay   = epsilon_decay
         self.learning_rate   = learning_rate
@@ -135,7 +135,6 @@ class Agent(nn.Module):
 
         else:
             model_input = self.model.create_model_input(state, env_id)
-
             #action = self.model.forward(model_input)
             action = self.model.q_val(model_input)
 
@@ -234,11 +233,13 @@ class Agent(nn.Module):
                 env_states[ actual_id_env ] = next_state
                 done = terminated or truncated  # truncated if fail to stand up -> penalize!
                 
+                if torch.is_tensor(reward): reward = reward.item()
+                reward = float(reward)
                 
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
 
-                #self.calculate_loss(state, next_state, reward, done, actual_id_env)
+                self.calculate_loss(state, next_state, reward, done, actual_id_env)
 
                 # terminate condition
                 if env_step[actual_id_env] >= 200: done = True
@@ -315,15 +316,48 @@ class Agent(nn.Module):
 
         loss = loss_ppo(self, actual_id_env, state, next_state, reward, done)
 
-        #for param in self.layer_without_gradient.parameters():
-        #    param.requires_grad = False
+        if actual_id_env == self.env1_id:
+            self.model.set_gradient_layer( self.model.input_env2, False )
+            self.model.set_gradient_layer( self.model.output_env2, False )
+            self.model.set_gradient_layer( self.model.input_env3, False )
+            self.model.set_gradient_layer( self.model.output_env3, False )
 
-        loss.backward()
+        elif actual_id_env == self.env2_id:
+            self.model.set_gradient_layer( self.model.input_env1, False )
+            self.model.set_gradient_layer( self.model.output_env1, False )
+            self.model.set_gradient_layer( self.model.input_env3, False )
+            self.model.set_gradient_layer( self.model.output_env3, False )
+
+        elif actual_id_env == self.env3_id:
+            self.model.set_gradient_layer( self.model.input_env1, False )
+            self.model.set_gradient_layer( self.model.output_env1, False )
+            self.model.set_gradient_layer( self.model.input_env2, False )
+            self.model.set_gradient_layer( self.model.output_env2, False )
+
+        print("ENABLE LOSS-BACKWARD")
+        #loss.backward()
         self.model.optimizer.step()
         self.model.optimizer.zero_grad()
 
-        #for param in self.layer_without_gradient.parameters():
-        #    param.requires_grad = True
+
+        if actual_id_env == self.env1_id:
+            self.model.set_gradient_layer( self.model.input_env2, True )
+            self.model.set_gradient_layer( self.model.output_env2, True )
+            self.model.set_gradient_layer( self.model.input_env3, True )
+            self.model.set_gradient_layer( self.model.output_env3, True )
+
+        elif actual_id_env == self.env2_id:
+            self.model.set_gradient_layer( self.model.input_env1, True )
+            self.model.set_gradient_layer( self.model.output_env1, True )
+            self.model.set_gradient_layer( self.model.input_env3, True )
+            self.model.set_gradient_layer( self.model.output_env3, True )
+
+        elif actual_id_env == self.env3_id:
+            self.model.set_gradient_layer( self.model.input_env1, True )
+            self.model.set_gradient_layer( self.model.output_env1, True )
+            self.model.set_gradient_layer( self.model.input_env2, True )
+            self.model.set_gradient_layer( self.model.output_env2, True )
+
 
         return 
 

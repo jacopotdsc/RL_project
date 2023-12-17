@@ -40,9 +40,9 @@ class Net(nn.Module):
         self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
 
         # output layers: one for each enviroment
-        self.fl_out_env1 = nn.Linear(in_features=32, out_features=self.env1_outputs, bias=bias)
-        self.fl_out_env2 = nn.Linear(in_features=32, out_features=self.env2_outputs, bias=bias)
-        self.fl_out_env3 = nn.Linear(in_features=32, out_features=self.env3_outputs, bias=bias)
+        self.output_env1 = nn.Linear(in_features=32, out_features=self.env1_outputs, bias=bias)
+        self.output_env2 = nn.Linear(in_features=32, out_features=self.env2_outputs, bias=bias)
+        self.output_env3 = nn.Linear(in_features=32, out_features=self.env3_outputs, bias=bias)
 
 
         # optimizer -> check how it work values
@@ -84,17 +84,22 @@ class Net(nn.Module):
         x = self.relu(x)
          
         if env_id == self.env1_id:
-            x = self.fl_out_env1(x)
+            x = self.output_env1(x)
 
         elif env_id == self.env2_id:
-            x = self.fl_out_env2(x)
+            x = self.output_env2(x)
             x = torch.clamp(x, min=-1.0, max=1.0)
 
         elif env_id == self.env3_id :
-            x = self.fl_out_env3(x)
+            x = self.output_env3(x)
         
         return x
 
+    def set_gradient_layer(self, layer, gradient_value):
+
+        # layer.paramters is a tensor. It set the gradient to all parameter in one iteration of the loop
+        for param in layer.parameters():
+            param.requires_grad = gradient_value
 
     def save(self, name = 'model.pt' ):
         torch.save(self.state_dict(), name )
