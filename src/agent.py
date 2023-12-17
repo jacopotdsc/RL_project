@@ -78,6 +78,7 @@ class Agent(nn.Module):
                                     env3_id=self.env1_id, env3_input=6, env3_outputs=3, 
                                     learning_rate=self.learning_rate).to(self.device) 
         
+
         # for plotting
         self.training_reward = []
         self.training_loss   = []
@@ -92,7 +93,6 @@ class Agent(nn.Module):
 
     # TODO: return action index -> used in evaluation
     def forward(self, x, env_id):
-        n_actions = self.evaluation_env.action_space.n
 
         model_input = {'state':x, 'env_id':env_id}
 
@@ -107,7 +107,7 @@ class Agent(nn.Module):
 
         return action
 
-    # TODO
+    # TODO: implement epsilon greedy
     def act(self, state, env_id):
 
         #print(f"id: {env_id}")
@@ -169,7 +169,6 @@ class Agent(nn.Module):
                 
                 return actual_env, actual_id_env, env_index
 
-       
 
     # training loop
     def train(self):
@@ -177,8 +176,8 @@ class Agent(nn.Module):
        
         max_epochs = 10
         switch_env_frequency = 20
-        window = 50 
 
+        window = 50 
         old_mean_reward = -999
         start_time = time.perf_counter()
 
@@ -186,6 +185,7 @@ class Agent(nn.Module):
         policy_distribution_env1 = {'actual':None, 'old-1':None, 'old-2':None}
         policy_distribution_env2 = {'actual':None, 'old-1':None, 'old-2':None}
         policy_distribution_env3 = {'actual':None, 'old-1':None, 'old-2':None}
+
         self.beta = 0.3
 
         for e in range(max_epochs):
@@ -206,7 +206,7 @@ class Agent(nn.Module):
 
             env_index  = random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
             done_counter = 0    # use to terminate episode
-            switch_counter = 0
+            switch_counter = 0  # plotting purporse
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
             actual_id_env = env_ids[env_index]       # contain id of the actual enviroment
@@ -234,6 +234,7 @@ class Agent(nn.Module):
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
 
+                self.calculate_loss(state, next_state, reward, done, actual_id_env)
 
                 # terminate condition
                 if env_step[actual_id_env] >= 200: done = True
@@ -305,8 +306,23 @@ class Agent(nn.Module):
             #self.save('model.pt')
 
     # how calculate loss
-    def calculate_loss(self, x):
-        return x
+    def calculate_loss(self, state, next_state, reward, done, actual_id_env):
+        self.model.optimizer.zero_grad()
+
+        loss = loss_ppo(self, actual_id_env, state, next_state, reward, done)
+
+
+        #for param in self.layer_without_gradient.parameters():
+        #    param.requires_grad = False
+
+        loss.backward()
+        self.model.optimizer.step()
+        self.model.optimizer.zero_grad()
+
+        #for param in self.layer_without_gradient.parameters():
+        #    param.requires_grad = True
+
+        return 
 
 
     # Utility functions

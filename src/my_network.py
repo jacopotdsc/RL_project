@@ -27,48 +27,41 @@ class Net(nn.Module):
         # activation function
         self.relu    = nn.ReLU()
         self.tan     = nn.Tanh()
-        self.pool    = nn.MaxPool2d(kernel_size=2)
-        self.flatten = nn.Flatten()
         self.softm   = nn.Softmax(dim=-1)
 
         # input layers
-        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=30, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.env1_input, out_features=30, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.env1_input, out_features=30, bias=bias)
+        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
 
-        # hidden layers
-        self.cn1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=7, stride=1, bias=bias)
-        self.cn2 = nn.Conv2d(in_channels=6, out_channels=12, kernel_size=4, stride=1, bias=bias)                     
-        self.fl1 = nn.Linear(5292, 216, bias=bias) 
+        # hidden layers                  
+        self.hl1 = nn.Linear(32, 216 , bias=bias) 
+        self.hl2 = nn.Linear(216, 216, bias=bias) 
+        self.hl3 = nn.Linear(216, 32, bias=bias) 
 
         # output layers: one for each enviroment
-        self.fl_out_env1 = nn.Linear(in_features=216, out_features=self.env1_outputs, bias=bias)
-        self.fl_out_env2 = nn.Linear(in_features=216, out_features=self.env2_outputs, bias=bias)
-        self.fl_out_env3 = nn.Linear(in_features=216, out_features=self.env3_outputs, bias=bias)
+        self.fl_out_env1 = nn.Linear(in_features=32, out_features=self.env1_outputs, bias=bias)
+        self.fl_out_env2 = nn.Linear(in_features=32, out_features=self.env2_outputs, bias=bias)
+        self.fl_out_env3 = nn.Linear(in_features=32, out_features=self.env3_outputs, bias=bias)
 
 
         # optimizer -> check how it work values
         self.optimizer = torch.optim.Adam(self.parameters(),lr=learning_rate)
 
 
-        
-
     # return the action's probabilities
     def forward(self, x):
-        
-        x = x['state']
-        env_id = x['env_id']
 
-        x = self.q_val(x, env_id)
-        x = self.softm(x)
+        q_val = self.q_val(x)
+        probs = self.softm(q_val)
 
-        return x
+        return probs
 
     # return the q-value -> input = ( x, env_id )
-    def q_val(self, input):
+    def q_val(self, my_input):
 
-        x = input[0]
-        env_id = input[1]
+        x = my_input['state']
+        env_id = my_input['env_id']
 
         if env_id == self.env1_id:
             x = self.input_env1(x)
@@ -79,17 +72,11 @@ class Net(nn.Module):
         elif env_id == self.env3_id :
             x = self.input_env3(x)
         
-        x = self.cn1(x)
+        x = self.hl1(x)
         x = self.relu(x)
-        x = self.pool(x)
-
-        x = self.cn2(x)
+        x = self.hl2(x)
         x = self.relu(x)
-        x = self.pool(x)
-
-        x = self.flatten(x)
-
-        x = self.fl1(x)
+        x = self.hl3(x)
         x = self.relu(x)
          
         if env_id == self.env1_id:
