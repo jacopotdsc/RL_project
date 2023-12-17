@@ -74,8 +74,8 @@ class Agent(nn.Module):
         self.input = 256 # find a standar dimension. probably each enviroment has it's input's shape
         
         self.model           = Net( env1_id=self.env1_id, env1_input=8, env1_outputs=4, 
-                                    env2_id=self.env1_id, env2_input=24, env2_outputs=2, 
-                                    env3_id=self.env1_id, env3_input=6, env3_outputs=3, 
+                                    env2_id=self.env2_id, env2_input=24, env2_outputs=4, 
+                                    env3_id=self.env3_id, env3_input=6, env3_outputs=3, 
                                     learning_rate=self.learning_rate).to(self.device) 
         
 
@@ -85,6 +85,7 @@ class Agent(nn.Module):
         self.reward_episode  = []
 
         print(self.model)
+        print(f"id -> env1: {self.model.env1_id}, env2: {self.model.env2_id}, env3: {self.model.env3_id}")
         print(f"{self.env1_id}:\t input:{self.env1_input}, output:{self.env1_action}")
         print(f"{self.env2_id}:\t input:{self.env2_input}, output:{self.env2_action}")
         print(f"{self.env3_id}:\t input:{self.env3_input}, output:{self.env3_action}")
@@ -94,24 +95,15 @@ class Agent(nn.Module):
     # TODO: return action index -> used in evaluation
     def forward(self, x, env_id):
 
-        model_input = {'state':x, 'env_id':env_id}
-
-        if self.env1_id == env_id:
-            action = self.model.forward(model_input)
-
-        elif self.env1_id == env_id:
-            action = self.model.forward(model_input)
-
-        else:
-            action = self.model.forward(model_input)
+        model_input = self.model.create_model_input(x, env_id)
+        action = self.model.forward(model_input)
 
         return action
 
     # TODO: implement epsilon greedy
-    def act(self, state, env_id):
-
-        #print(f"id: {env_id}")
+    def act(self, state, env_id, env_type = None):  
         
+        '''
         if env_id == self.env1_id:
             if self.env1_type_a == self.action_type_discrete:
                 action = random.randint(0, self.env1_action -1 )
@@ -129,19 +121,31 @@ class Agent(nn.Module):
                 action = random.randint(0, self.env3_action -1 )
             else:
                 action = np.random.uniform(-1, 1, self.env3_action)
-
         '''
-        if np.random.rand() > self.epsilon:
+    
+        if np.random.uniform(0,1) < self.epsilon:
+            if env_id == self.env1_id:
+                action = random.randint(0, self.env1_action -1 )
 
-            model_input = ( state, env_id)
-            act_values = self.forward( model_input )
-            action = torch.argmax(act_values[0])
+            elif env_id == self.env2_id:
+                action = np.random.uniform(-1, 1, self.env2_action)
+                
+            elif env_id == self.env3_id:
+                action = random.randint(0, self.env3_action -1 )
 
         else:
-            # it vary based on enviroment id
-            action = random.randint(0,4)
-            # action = np.random.uniform(low=-1, high=1, size=3) # for continuous case
-        '''
+            model_input = self.model.create_model_input(state, env_id)
+
+            #action = self.model.forward(model_input)
+            action = self.model.q_val(model_input)
+
+            if env_id == self.env2_id:
+                action = action.detach().cpu()
+            else:
+                action = torch.argmax(action).item()
+
+        # when changing to dinamic choice, use env_type to do it
+
         return action
 
     def swtich_enviroment(self, actual_id_env, env_ids, env_done, env_index):
@@ -223,7 +227,7 @@ class Agent(nn.Module):
                     #print(f"new: {actual_id_env}\n")
 
                 state = env_states[ actual_id_env ]
-                action = self.act(state, actual_id_env) # TODO: implement epsilon-greedy policy
+                action = self.act(state, actual_id_env) 
                 
                 
                 next_state, reward, terminated, truncated, _ = actual_env.step(action)
@@ -234,7 +238,7 @@ class Agent(nn.Module):
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
 
-                self.calculate_loss(state, next_state, reward, done, actual_id_env)
+                #self.calculate_loss(state, next_state, reward, done, actual_id_env)
 
                 # terminate condition
                 if env_step[actual_id_env] >= 200: done = True
@@ -310,7 +314,6 @@ class Agent(nn.Module):
         self.model.optimizer.zero_grad()
 
         loss = loss_ppo(self, actual_id_env, state, next_state, reward, done)
-
 
         #for param in self.layer_without_gradient.parameters():
         #    param.requires_grad = False

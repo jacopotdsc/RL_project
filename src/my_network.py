@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 import numpy as np
+from utils import *
 
 class Net(nn.Module):
     def __init__(self,  env1_id, env1_input, env1_outputs, 
@@ -31,13 +31,13 @@ class Net(nn.Module):
 
         # input layers
         self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=32, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=32, bias=bias)
 
         # hidden layers                  
-        self.hl1 = nn.Linear(32, 216 , bias=bias) 
-        self.hl2 = nn.Linear(216, 216, bias=bias) 
-        self.hl3 = nn.Linear(216, 32, bias=bias) 
+        self.hl1 = nn.Linear(in_features=32,  out_features=216, bias=bias) 
+        self.hl2 = nn.Linear(in_features=216, out_features=216, bias=bias) 
+        self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
 
         # output layers: one for each enviroment
         self.fl_out_env1 = nn.Linear(in_features=32, out_features=self.env1_outputs, bias=bias)
@@ -48,7 +48,9 @@ class Net(nn.Module):
         # optimizer -> check how it work values
         self.optimizer = torch.optim.Adam(self.parameters(),lr=learning_rate)
 
-
+    def create_model_input(self, state, env_id):
+         return {'state':state, 'env_id': env_id}
+    
     # return the action's probabilities
     def forward(self, x):
 
@@ -63,6 +65,8 @@ class Net(nn.Module):
         x = my_input['state']
         env_id = my_input['env_id']
 
+        x = preprocess_image(x)
+
         if env_id == self.env1_id:
             x = self.input_env1(x)
 
@@ -71,7 +75,7 @@ class Net(nn.Module):
 
         elif env_id == self.env3_id :
             x = self.input_env3(x)
-        
+            
         x = self.hl1(x)
         x = self.relu(x)
         x = self.hl2(x)
@@ -84,39 +88,24 @@ class Net(nn.Module):
 
         elif env_id == self.env2_id:
             x = self.fl_out_env2(x)
-            x = self.tan(x)
+            x = torch.clamp(x, min=-1.0, max=1.0)
 
         elif env_id == self.env3_id :
             x = self.fl_out_env3(x)
         
         return x
-    
-# Plotting function
-def plot_training_rewards(agent):
-        cumulative_mean = np.cumsum(agent.training_reward ) / len(agent.training_reward )
-        plt.plot(cumulative_mean)
-        plt.title('Mean training rewards')
-        plt.ylabel('Reward')
-        plt.xlabel('Episods')
-        #plt.show()
-        plt.savefig('plot/mean_training_rewards.png')
-        plt.clf()
 
-def plot_training_loss(agent):
-        cumulative_mean = np.cumsum(agent.training_loss) / len(agent.training_loss)
-        plt.plot(cumulative_mean)
-        plt.title('plot/Mean training loss')
-        plt.ylabel('loss')
-        plt.xlabel('timestep')
-        #plt.show()
-        plt.savefig('mean_training_loss.png')
-        plt.clf()
 
-def plot_episode_reward(agent):
-        plt.plot(agent.reward_episode)
-        plt.title('Rewards')
-        plt.ylabel('rewards')
-        plt.xlabel('timestep')
-        #plt.show()
-        plt.savefig('plot/episode_rewards.png')
-        plt.clf()
+    def save(self, name = 'model.pt' ):
+        torch.save(self.state_dict(), name )
+
+    def load(self, name = 'model.pt'):
+        self.load_state_dict(torch.load(name, map_location = self.device))
+         
+    def to(self, device):
+        ret = super().to(device)
+        ret.device = device
+        return ret
+
+
+        
