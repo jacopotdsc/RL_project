@@ -2,7 +2,61 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torchvision import transforms
 import torch
-#from PIL import Image
+
+import random
+from collections import namedtuple, deque
+
+
+
+class Buffer:
+
+    def __init__(self, agent, memory_size=500, batch_size=32):
+
+        self.agent = agent
+        self.batch_size = batch_size
+        self.memory_size = memory_size
+        
+        self.buffer_env1  = deque(maxlen=memory_size)
+        self.buffer_env2  = deque(maxlen=memory_size)
+        self.buffer_env3  = deque(maxlen=memory_size)
+        
+        
+    def add(self, state, env_id):
+
+        #self.replay_memory.append( self.Buffer(state) ) 
+        
+        if env_id == self.agent.env1_id: self.buffer_env1.append(state)
+        elif env_id == self.agent.env2_id: self.buffer_env2.append(state)
+        elif env_id == self.agent.env3_id: self.buffer_env3.append(state)
+
+
+    def sample(self, env_id):
+        
+        print(f"sampling from: {env_id}")
+        if env_id == self.agent.env1_id: 
+             print(f" entered {env_id}")
+             samples = random.sample(self.buffer_env1, self.batch_size)
+
+        elif env_id == self.agent.env2_id: 
+             print(f" entered {env_id}")
+             samples = random.sample(self.buffer_env2, self.batch_size)
+             
+        elif env_id == self.agent.env3_id: 
+             print(f" entered {env_id}")
+             samples = random.sample(self.buffer_env3, self.batch_size)
+
+        return samples
+    
+    def buffer_size(self, env_id):
+
+        if env_id == self.agent.env1_id: 
+             return len(self.buffer_env1)
+
+        elif env_id == self.agent.env2_id: 
+             return len(self.buffer_env2)
+        
+        elif env_id == self.agent.env3_id: 
+             return len(self.buffer_env3)
 
 def preprocess_image(state):
     state = torch.tensor(state)

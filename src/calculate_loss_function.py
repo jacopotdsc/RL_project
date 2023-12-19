@@ -1,5 +1,5 @@
 import torch
-    
+import torch.nn as nn
 
 def Dkl(actual_policy, old_policy):
     '''
@@ -33,9 +33,20 @@ def total_loss():
 def loss_pg(agent):
     return None
 
-def loss_ppo( agent, actual_id_env, state, next_state, reward, done):
+def loss_ppo(agent , actual_policy, old_policy, beta, omega, k=1):
+    # k -----> set of policies used in Synaptic Consolidation
+
     
-    return None
+    kldiv_loss = nn.KLDivLoss(reduction="batchmean")
+
+    #print(f"ppo, actual policy: {actual_policy}")
+    #print(f"ppo, old policy: {old_policy}")
+    print(f"ppo, kl div: {kldiv_loss(actual_policy, old_policy)}")
+
+    result = -(1/k)*beta*(omega**(k-1))*kldiv_loss(actual_policy, old_policy) #.clone().detach().requires_grad_(True)
+    
+    print(f"ppo, total loss value: {result}")
+    return result
 
 def loss_casc(agent):
     return None
