@@ -28,7 +28,7 @@ class Agent(nn.Module):
 
         # hyperparameters
         self.gamma           = gamma
-        self.epsilon         = 0#epsilon
+        self.epsilon         = epsilon
         self.epsilon_min     = epsilon_min
         self.epsilon_decay   = epsilon_decay
 
@@ -198,13 +198,13 @@ class Agent(nn.Module):
 
     def train(self):
        
-        self.buffer = Buffer(self, memory_size=500, batch_size = 32)
-        max_epochs = 1
+        self.buffer = Buffer(self, memory_size=500, batch_size = 64)
+        max_epochs = 100
         switch_env_frequency = 20
 
         
         step_train = 0
-        calculate_loss_frequency = 64
+        calculate_loss_frequency = 10
 
         window = 50 
         old_mean_reward = -999
@@ -274,7 +274,7 @@ class Agent(nn.Module):
                     self.calculate_loss(state, action, next_state, reward, done, actual_id_env, self.beta, self.omega)
 
                 # terminate condition
-                if env_step[actual_id_env] >= 200: done = True
+                if env_step[actual_id_env] >= 500: done = True
 
                 # plot statstics
                 if done:
@@ -296,10 +296,7 @@ class Agent(nn.Module):
                     #print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
                     #print(f"Enviroment done: {actual_id_env}")
 
-                    self.epsilon *= self.epsilon_decay
-
-                    if self.epsilon < self.epsilon_min:
-                        self.epsilon = self.epsilon_min
+                    
 
 
                     #plot_training_rewards(self)
@@ -314,6 +311,10 @@ class Agent(nn.Module):
                         #self.save('end_episode.pt')
 
                     if done_counter >= len(self.env_array):
+                        self.epsilon *= self.epsilon_decay
+
+                        if self.epsilon < self.epsilon_min:
+                            self.epsilon = self.epsilon_min
                         break
 
            
@@ -340,7 +341,7 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-            #self.save('model.pt')
+            self.save('model.pt')
 
     # how calculate loss
     def calculate_loss(self, state, action, next_state, reward, done, actual_id_env, beta, omega):
@@ -410,9 +411,9 @@ class Agent(nn.Module):
             #graph = make_dot(new_pi, params=dict(self.model.named_parameters()))
             #graph.render("computational_graph", format="png")  
             
-            print(f"old policy: {old_pi}")
-            print(f"new policy: {new_pi}")
-            print(f"loss value: {loss_value}, type: {type(loss_value)}\n")
+            #print(f"old policy: {old_pi}")
+            #print(f"new policy: {new_pi}")
+            #print(f"loss value: {loss_value}, type: {type(loss_value)}\n")
 
 
         # keeping the record of my policy

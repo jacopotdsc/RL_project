@@ -41,11 +41,11 @@ def loss_ppo(agent , actual_policy, old_policy, beta, omega, k=1):
 
     #print(f"ppo, actual policy: {actual_policy}")
     #print(f"ppo, old policy: {old_policy}")
-    print(f"ppo, kl div: {kldiv_loss(actual_policy, old_policy)}")
+    #print(f"ppo, kl div: {kldiv_loss(actual_policy, old_policy)}")
 
     result = -(1/k)*beta*(omega**(k-1))*kldiv_loss(actual_policy, old_policy) #.clone().detach().requires_grad_(True)
     
-    print(f"ppo, total loss value: {result}")
+    #print(f"ppo, total loss value: {result}")
     return result
 
 def loss_casc(agent):
