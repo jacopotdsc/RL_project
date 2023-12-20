@@ -1,27 +1,12 @@
 import torch
-    
+import torch.nn as nn
 
 def Dkl(actual_policy, old_policy):
-    '''
-        env 1
-        [ 0.3, 0.1, 0.2, 0.4 ]
 
-            training -> backward(loss) -> new weight
-
-        [ 0.2, 0.5, 0.25, 0.05 ]
-
-
-        0.3 * log ( 0.3/0.2  ) -> v1
-        0.1 * log ( 0.1/0.5  ) -> v2 
-
-        distance = v1 + v2 ...
-    '''
-
-    actual_policy = actual_policy.clamp(min=1e-9)
-    old_policy = old_policy.clamp(min=1e-9)
-
+    actual_policy = torch.mean(actual_policy.type(torch.FloatTensor), axis=0)
+    old_policy    = torch.mean(old_policy.type(torch.FloatTensor), axis=0)
     distance = torch.sum( actual_policy * torch.log( actual_policy/old_policy ) )
-
+   
     return distance
 
 def total_loss():
@@ -33,9 +18,25 @@ def total_loss():
 def loss_pg(agent):
     return None
 
-def loss_ppo( agent, actual_id_env, state, next_state, reward, done):
+def loss_ppo(actual_id_env, actual_policy, old_policy, beta, omega, k=1):
+    # k -----> set of policies used in Synaptic Consolidation
+
     
-    return None
+    kldiv_loss = nn.KLDivLoss(reduction="batchmean")
+   
+
+    #print(f"ppo, actual policy: {actual_policy}")
+    #print(f"ppo, old policy: {old_policy}")
+    #print(f"ppo, kl div: {kldiv_loss(actual_policy, old_policy)}")
+
+    #result = -(1/k)*beta*(omega**(k-1))*kldiv_loss(actual_policy, old_policy) #.clone().detach().requires_grad_(True)
+    my_beta = 0.7
+    distance = my_beta * kldiv_loss(actual_policy, old_policy)
+    #print(f"id: {actual_id_env}, loss value: {distance}, mean act {torch.mean(actual_policy)}[{len(actual_policy)}],mean old {torch.mean(old_policy)}[{len(old_policy)}],  type: {type(distance)}\n")
+    #print("id: {}, loss value: {:.3f}, mean act {:.3f}[{}], mean old {:.3f}[{}], type: {}\n".format( actual_id_env, distance, torch.mean(actual_policy), len(actual_policy),torch.mean(old_policy), len(old_policy), type(distance).__name__))
+    
+    #print(f"ppo, total loss value: {distance}")
+    return distance
 
 def loss_casc(agent):
     return None

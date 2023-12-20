@@ -30,19 +30,19 @@ class Net(nn.Module):
         self.softm   = nn.Softmax(dim=-1)
 
         # input layers
-        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=32, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=32, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=32, bias=bias)
+        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=16, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=16, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=16, bias=bias)
 
         # hidden layers                  
-        self.hl1 = nn.Linear(in_features=32,  out_features=216, bias=bias) 
-        self.hl2 = nn.Linear(in_features=216, out_features=216, bias=bias) 
-        self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
+        self.hl1 = nn.Linear(in_features=16,  out_features=64, bias=bias) 
+        self.hl2 = nn.Linear(in_features=64, out_features=16, bias=bias) 
+        #self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
 
         # output layers: one for each enviroment
-        self.output_env1 = nn.Linear(in_features=32, out_features=self.env1_outputs, bias=bias)
-        self.output_env2 = nn.Linear(in_features=32, out_features=self.env2_outputs, bias=bias)
-        self.output_env3 = nn.Linear(in_features=32, out_features=self.env3_outputs, bias=bias)
+        self.output_env1 = nn.Linear(in_features=16, out_features=self.env1_outputs, bias=bias)
+        self.output_env2 = nn.Linear(in_features=16, out_features=self.env2_outputs, bias=bias)
+        self.output_env3 = nn.Linear(in_features=16, out_features=self.env3_outputs, bias=bias)
 
 
         # optimizer -> check how it work values
@@ -55,7 +55,12 @@ class Net(nn.Module):
     def forward(self, x):
 
         q_val = self.q_val(x)
-        probs = self.softm(q_val)
+
+        # implement dinamic choice with env_type in agent
+        if x['env_id'] == self.env2_id:
+            probs = self.softm(q_val)
+        else:
+            probs = self.softm(q_val)
 
         return probs
 
@@ -75,20 +80,20 @@ class Net(nn.Module):
 
         elif env_id == self.env3_id :
             x = self.input_env3(x)
-            
+        
         x = self.hl1(x)
         x = self.relu(x)
         x = self.hl2(x)
         x = self.relu(x)
-        x = self.hl3(x)
-        x = self.relu(x)
-         
+        #x = self.hl3(x)
+        #x = self.relu(x)
+        
         if env_id == self.env1_id:
             x = self.output_env1(x)
 
         elif env_id == self.env2_id:
             x = self.output_env2(x)
-            x = torch.clamp(x, min=-1.0, max=1.0)
+            x = torch.clamp(x, min=-2.0, max=2.0)
 
         elif env_id == self.env3_id :
             x = self.output_env3(x)
@@ -101,11 +106,6 @@ class Net(nn.Module):
         for param in layer.parameters():
             param.requires_grad = gradient_value
 
-    def save(self, name = 'model.pt' ):
-        torch.save(self.state_dict(), name )
-
-    def load(self, name = 'model.pt'):
-        self.load_state_dict(torch.load(name, map_location = self.device))
          
     def to(self, device):
         ret = super().to(device)
