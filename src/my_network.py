@@ -106,12 +106,6 @@ class Net(nn.Module):
         for param in layer.parameters():
             param.requires_grad = gradient_value
 
-    def save(self, name = 'model.pt' ):
-        torch.save(self.state_dict(), name )
-        
-
-    def load(self, name = 'model.pt'):
-        self.load_state_dict(torch.load(name, map_location = self.device))
          
     def to(self, device):
         ret = super().to(device)
