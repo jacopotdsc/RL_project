@@ -105,7 +105,9 @@ class Agent(nn.Module):
         
 
         # for plotting
-        self.training_reward = []
+        self.training_reward = {    self.env1_id: [], 
+                                    self.env2_id: [], 
+                                    self.env3_id: [] }
         self.training_loss   = {    self.env1_id: [], 
                                     self.env2_id: [], 
                                     self.env3_id: [] }
@@ -120,9 +122,9 @@ class Agent(nn.Module):
 
 
     # TODO: return action index -> used in evaluation
-    def forward(self, x, env_id):
+    def forward(self, x):
 
-        model_input = self.model.create_model_input(x, env_id)
+        model_input = self.model.create_model_input(x, self.evaluation_env)
         action = self.model.forward(model_input)
 
         return action
@@ -290,10 +292,10 @@ class Agent(nn.Module):
                     total_reward = np.array(list(env_reward.values())).sum()
                     total_steps = np.array(list(env_step.values())).sum()
 
-                    self.training_reward.append(total_reward)
+                    self.training_reward[actual_id_env].append(total_reward)
                     self.reward_episode.append(total_reward)
 
-                    mean_rewards = np.mean(self.training_reward[-window:])
+                    #mean_rewards = np.mean(self.training_reward[-window:])
                     #mean_loss    = np.mean(self.training_loss[-window:])
                     
                     #print("\nEpisode {:d}/{:d}, id: {}, Step: {:d}".format(e, max_epochs, actual_id_env, env_step[actual_id_env]))
@@ -306,14 +308,16 @@ class Agent(nn.Module):
 
                     #plot_training_rewards(self)
                     #plot_training_loss(self)
-                    #plot_episode_reward(self)
+                    #plot_episode_reward(self)      
 
+                    '''
                     actual_mean_reward = np.mean(list(self.training_reward[-window:])) 
 
                     if actual_mean_reward > old_mean_reward:
                         #print("Better model! old_mean_reward: {:.2f}, new_mean_reward: {:.2f}".format(old_mean_reward, actual_mean_reward))
                         old_mean_reward = actual_mean_reward
                         #self.save('end_episode.pt')
+                    '''
 
                     if done_counter >= len(self.env_array):
                         self.epsilon *= self.epsilon_decay
@@ -321,7 +325,7 @@ class Agent(nn.Module):
                         if self.epsilon < self.epsilon_min:
                             self.epsilon = self.epsilon_min
                         break
-
+                    
            
             print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}], Switch: {}".format( e,
                                                                     max_epochs,
@@ -335,9 +339,17 @@ class Agent(nn.Module):
                 if len(value) > 0:
                     mean_loss.append( torch.mean(torch.stack(value[-window:]) ).item() )
 
-            print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = [{}]".format(mean_rewards, 
+            '''
+            mean_reward = []
+            for key, value in self.training_reward.items():
+                if len(value) > 0:
+                    mean_reward.append( torch.mean(torch.stack(value[-window:]) ).item() )
+            '''
+            
+            print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format(    0, 
                                                                                               ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
-                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) )))
+                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) ))
+                                                                                              )
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
 
@@ -352,7 +364,7 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-            self.save('model.pt')
+            self.model.save('model.pt')
 
     # how calculate loss
     def calculate_loss(self, state, action, next_state, reward, done, actual_id_env, beta, omega):
@@ -417,13 +429,13 @@ class Agent(nn.Module):
             actual_pi_stacked_tensor = torch.stack(prediction_actual, dim=0)
 
             #loss_value = loss_ppo(self, new_pi, old_pi, beta, omega)
-            loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor, beta, omega)
+            loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor)
 
             #graph = make_dot(new_pi, params=dict(self.model.named_parameters()))
             #graph.render("computational_graph", format="png")  
             
             #print(f"old policy: {old_pi}")
-            #print(f"new policy: {new_pi}")
+            #print(f"new policy: {new_pi}\n")
             #print(f"id: {actual_id_env}, loss value: {loss_value}, type: {type(loss_value)}\n")
 
 

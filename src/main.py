@@ -5,20 +5,25 @@ from agent import *
 import gymnasium as gym
 
 def evaluate(env=None, n_episodes=1, render=False):
+    
     agent = Agent(env)
-    agent.load()
+    print(f"\nplaying env: {env}\n")
+    agent.model.load()
 
     #env = gym.make('CarRacing-v2', continuous=agent.continuous)
     #if render:
         #env = gym.make('CarRacing-v2', continuous=agent.continuous, render_mode='human')
-        
+    
+    render = 'human'
+    env = gym.make(env, render_mode=render)
+
     rewards = []
     for episode in range(n_episodes):
         total_reward = 0
         done = False
         s, _ = env.reset()
         while not done:
-            action = agent.act(s)
+            action = torch.argmax(agent.forward(s)).item()
             
             s, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
@@ -32,7 +37,7 @@ def evaluate(env=None, n_episodes=1, render=False):
 def train():
     agent = Agent()
     agent.train()
-    agent.save()
+    agent.model.save()
 
 
 def main():
@@ -50,15 +55,15 @@ def main():
 
     # write the tree enviroment 
     if args.evaluate1:
-        env1 = None  # insert the string id, enviroment will be created into the agent
+        env1 = 'MountainCar-v0'  # insert the string id, enviroment will be created into the agent
         evaluate(render=args.render, env=env1)
 
     if args.evaluate2:
-        env2 = None
+        env2 = 'LunarLander-v2'
         evaluate(render=args.render, env=env2)
 
-    if args.evaluate2:
-        env3 = None
+    if args.evaluate3:
+        env3 = 'CartPole-v0'
         evaluate(render=args.render, env=env3)
 
     

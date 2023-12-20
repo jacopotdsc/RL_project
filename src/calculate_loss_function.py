@@ -18,7 +18,7 @@ def total_loss():
 def loss_pg(agent):
     return None
 
-def loss_ppo(actual_id_env, actual_policy, old_policy, beta, omega, k=1):
+def loss_ppo(actual_id_env, actual_policy, old_policy, k=1):
     # k -----> set of policies used in Synaptic Consolidation
 
     
@@ -30,8 +30,9 @@ def loss_ppo(actual_id_env, actual_policy, old_policy, beta, omega, k=1):
     #print(f"ppo, kl div: {kldiv_loss(actual_policy, old_policy)}")
 
     #result = -(1/k)*beta*(omega**(k-1))*kldiv_loss(actual_policy, old_policy) #.clone().detach().requires_grad_(True)
-    my_beta = 0.7
-    distance = my_beta * kldiv_loss(actual_policy, old_policy)
+    beta = 2.0
+    omega = 8.0
+    distance = beta * omega * kldiv_loss(actual_policy, old_policy)
     #print(f"id: {actual_id_env}, loss value: {distance}, mean act {torch.mean(actual_policy)}[{len(actual_policy)}],mean old {torch.mean(old_policy)}[{len(old_policy)}],  type: {type(distance)}\n")
     #print("id: {}, loss value: {:.3f}, mean act {:.3f}[{}], mean old {:.3f}[{}], type: {}\n".format( actual_id_env, distance, torch.mean(actual_policy), len(actual_policy),torch.mean(old_policy), len(old_policy), type(distance).__name__))
     
