@@ -35,8 +35,8 @@ class Net(nn.Module):
         self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=16, bias=bias)
 
         # hidden layers                  
-        self.hl1 = nn.Linear(in_features=16,  out_features=16, bias=bias) 
-        #self.hl2 = nn.Linear(in_features=216, out_features=216, bias=bias) 
+        self.hl1 = nn.Linear(in_features=16,  out_features=64, bias=bias) 
+        self.hl2 = nn.Linear(in_features=64, out_features=16, bias=bias) 
         #self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
 
         # output layers: one for each enviroment
@@ -82,9 +82,9 @@ class Net(nn.Module):
             x = self.input_env3(x)
         
         x = self.hl1(x)
-        x = self.tan(x)
-        #x = self.hl2(x)
-        #x = self.relu(x)
+        x = self.relu(x)
+        x = self.hl2(x)
+        x = self.relu(x)
         #x = self.hl3(x)
         #x = self.relu(x)
         
@@ -93,7 +93,7 @@ class Net(nn.Module):
 
         elif env_id == self.env2_id:
             x = self.output_env2(x)
-            x = torch.clamp(x, min=-1.0, max=1.0)
+            x = torch.clamp(x, min=-2.0, max=2.0)
 
         elif env_id == self.env3_id :
             x = self.output_env3(x)
@@ -107,7 +107,8 @@ class Net(nn.Module):
             param.requires_grad = gradient_value
 
     def save(self, name = 'model.pt' ):
-        torch.save(self.state_dict(), name )
+        #torch.save(self.state_dict(), name )
+        return
 
     def load(self, name = 'model.pt'):
         self.load_state_dict(torch.load(name, map_location = self.device))

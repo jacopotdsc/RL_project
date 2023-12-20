@@ -46,7 +46,7 @@ class Agent(nn.Module):
         self.action_type_discrete   = 'Discrete'
         self.action_type_continuous = 'Continuous'
 
-        self.env1_id     = 'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
+        self.env1_id     = 'MountainCar-v0' #'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
         self.env1        = gym.make(self.env1_id, render_mode=self.render)  # gym.make('HalfCheetah-v2')
         obs1_shape       = self.env1.observation_space.shape
         self.env1_input  = obs1_shape[0] if len(obs1_shape) == 1 else obs1_shape[0]*obs1_shape[1]
@@ -54,13 +54,14 @@ class Agent(nn.Module):
         self.env1_type_a = self.action_type_discrete if type(self.env1.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
         
         
-        self.env2_id     = 'BipedalWalker-v3'                               # https://www.gymlibrary.dev/environments/box2d/bipedal_walker/
+        self.env2_id     = 'LunarLander-v2' #'Pendulum-v1'#'BipedalWalker-v3'                               # https://www.gymlibrary.dev/environments/box2d/bipedal_walker/
         self.env2        = gym.make(self.env2_id, render_mode=self.render)  # gym.make('HumanoidSmallLeg-v0')  
         obs2_shape       = self.env2.observation_space.shape
         self.env2_input  = obs2_shape[0] if len(obs2_shape) == 1 else obs2_shape[0]*obs2_shape[1]
         self.env2_action = self.env2.action_space.n if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.env2.action_space.shape[0]
         self.env2_type_a = self.action_type_discrete if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
         
+        '''
         # discretizzazione dell'Action Space se continuous:
         if not type(self.env2.action_space)== gym.spaces.discrete.Discrete:
             n_actions = self.env2_action
@@ -74,10 +75,10 @@ class Agent(nn.Module):
                 action[i] = torch.tensor(high_value[0])
                 discrete_actions_env2.append(action)
             self.discrete_actions_env2 = discrete_actions_env2
-
+        '''
         
         
-        self.env3_id     = 'Acrobot-v1'                                     # https://www.gymlibrary.dev/environments/classic_control/acrobot/
+        self.env3_id     = 'CartPole-v0' #'Acrobot-v1'                                     # https://www.gymlibrary.dev/environments/classic_control/acrobot/
         self.env3        = gym.make(self.env3_id, render_mode=self.render)  # gym.make('RoboschoolHumanoid-v1')   
         obs3_shape       = self.env3.observation_space.shape
         self.env3_input  = obs3_shape[0] if len(obs3_shape) == 1 else obs3_shape[0]*obs3_shape[1]
@@ -94,9 +95,9 @@ class Agent(nn.Module):
         # Network
         self.input = 256 # find a standar dimension. probably each enviroment has it's input's shape
         
-        self.model           = Net( env1_id=self.env1_id, env1_input=8, env1_outputs=4, 
-                                    env2_id=self.env2_id, env2_input=24, env2_outputs=4,#len(self.discrete_actions_env2), 
-                                    env3_id=self.env3_id, env3_input=6, env3_outputs=3, 
+        self.model           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
+                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
                                     learning_rate=self.learning_rate).to(self.device) 
         
 
@@ -105,7 +106,9 @@ class Agent(nn.Module):
 
         # for plotting
         self.training_reward = []
-        self.training_loss   = []
+        self.training_loss   = {    self.env1_id: [], 
+                                    self.env2_id: [], 
+                                    self.env3_id: [] }
         self.reward_episode  = []
 
         print(self.model)
@@ -152,7 +155,8 @@ class Agent(nn.Module):
                 action = random.randint(0, self.env1_action -1 )
 
             elif env_id == self.env2_id:
-                action = np.random.uniform(-1, 1, self.env2_action)
+                #action = np.random.uniform(-1, 1, self.env2_action)
+                action = random.randint(0, self.env2_action -1 )
                 
             elif env_id == self.env3_id:
                 action = random.randint(0, self.env3_action -1 )
@@ -163,7 +167,8 @@ class Agent(nn.Module):
             action = self.model.q_val(model_input)
 
             if env_id == self.env2_id:
-                action = action.detach().cpu()
+                #action = action.detach().cpu()
+                action = torch.argmax(action).item()
             else:
                 action = torch.argmax(action).item()
 
@@ -199,12 +204,12 @@ class Agent(nn.Module):
     def train(self):
        
         self.buffer = Buffer(self, memory_size=500, batch_size = 64)
-        max_epochs = 100
+        max_epochs = 300
         switch_env_frequency = 20
 
         
         step_train = 0
-        calculate_loss_frequency = 10
+        calculate_loss_frequency = 5
 
         window = 50 
         old_mean_reward = -999
@@ -289,7 +294,7 @@ class Agent(nn.Module):
                     self.reward_episode.append(total_reward)
 
                     mean_rewards = np.mean(self.training_reward[-window:])
-                    mean_loss    = np.mean(self.training_loss[-window:])
+                    #mean_loss    = np.mean(self.training_loss[-window:])
                     
                     #print("\nEpisode {:d}/{:d}, id: {}, Step: {:d}".format(e, max_epochs, actual_id_env, env_step[actual_id_env]))
                     #print("Mean Rewards {:.2f},  Episode reward = {:.2f},  mean loss = {:.3f}".format(mean_rewards, env_reward[actual_id_env], mean_loss ) )
@@ -324,9 +329,16 @@ class Agent(nn.Module):
                                                                     ', '.join( map(str,list(env_step.values()) )),
                                                                     switch_counter
                                                                     ))
+            
+            mean_loss = []
+            for key, value in self.training_loss.items():
+                print(f"{torch.stack(value[-window:])}")
+                #mean_loss.append( torch.mean(torch.stack(value[-window:]) ) )
+
             print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = {:.3f}".format(mean_rewards, 
                                                                                               ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
-                                                                                              mean_loss ) 
+                                                                                              0)
+                                                                                              #mean_loss ) 
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
 
@@ -406,14 +418,14 @@ class Agent(nn.Module):
             actual_pi_stacked_tensor = torch.stack(prediction_actual, dim=0)
 
             #loss_value = loss_ppo(self, new_pi, old_pi, beta, omega)
-            loss_value = loss_ppo(self, actual_pi_stacked_tensor, old_pi_stacked_tensor, beta, omega)
+            loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor, beta, omega)
 
             #graph = make_dot(new_pi, params=dict(self.model.named_parameters()))
             #graph.render("computational_graph", format="png")  
             
             #print(f"old policy: {old_pi}")
             #print(f"new policy: {new_pi}")
-            #print(f"loss value: {loss_value}, type: {type(loss_value)}\n")
+            #print(f"id: {actual_id_env}, loss value: {loss_value}, type: {type(loss_value)}\n")
 
 
         # keeping the record of my policy
@@ -424,6 +436,8 @@ class Agent(nn.Module):
         self.old_policy.optimizer = None
         
         #loss_value = torch.tensor(loss_value.item(), requires_grad = True)
+
+        self.training_loss[actual_id_env].append(loss_value)
 
         loss_value.backward()
         self.model.optimizer.step()
