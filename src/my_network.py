@@ -28,6 +28,7 @@ class Net(nn.Module):
         self.relu    = nn.ReLU()
         self.tan     = nn.Tanh()
         self.softm   = nn.Softmax(dim=-1)
+        self.log_soft = nn.LogSoftmax()
 
         # input layers
         self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=16, bias=bias)
@@ -61,6 +62,18 @@ class Net(nn.Module):
             probs = self.softm(q_val)
         else:
             probs = self.softm(q_val)
+
+        return probs
+
+    def log_pi(self, x):
+
+        q_val = self.q_val(x)
+
+        # implement dinamic choice with env_type in agent
+        if x['env_id'] == self.env2_id:
+            probs = self.log_soft(q_val)
+        else:
+            probs = self.log_soft(q_val)
 
         return probs
 
@@ -106,6 +119,13 @@ class Net(nn.Module):
         for param in layer.parameters():
             param.requires_grad = gradient_value
 
+    # Utility functions
+    def save(self, name = 'model.pt' ):
+        print("saving weight model")
+        torch.save(self.state_dict(), name )
+
+    def load(self, name = 'model.pt'):
+        self.load_state_dict(torch.load(name,  map_location=self.device) )
          
     def to(self, device):
         ret = super().to(device)

@@ -105,14 +105,13 @@ class Agent(nn.Module):
         
 
         # for plotting
-        self.training_reward = {self.env1_id: [], 
-                                self.env2_id: [], 
-                                self.env3_id: [] }
-        self.training_loss   = {self.env1_id: [], 
-                                self.env2_id: [], 
-                                self.env3_id: [] }
+        self.training_reward = {    self.env1_id: [], 
+                                    self.env2_id: [], 
+                                    self.env3_id: [] }
+        self.training_loss   = {    self.env1_id: [], 
+                                    self.env2_id: [], 
+                                    self.env3_id: [] }
         self.reward_episode  = []
-        self.mean_reward     = []
 
         print(self.model)
         print(f"id -> env1: {self.model.env1_id}, env2: {self.model.env2_id}, env3: {self.model.env3_id}")
@@ -123,9 +122,9 @@ class Agent(nn.Module):
 
 
     # TODO: return action index -> used in evaluation
-    def forward(self, x, env_id):
+    def forward(self, x):
 
-        model_input = self.model.create_model_input(x, env_id)
+        model_input = self.model.create_model_input(x, self.evaluation_env)
         action = self.model.forward(model_input)
 
         return action
@@ -207,7 +206,7 @@ class Agent(nn.Module):
     def train(self):
        
         self.buffer = Buffer(self, memory_size=500, batch_size = 64)
-        max_epochs = 50
+        max_epochs = 20
         switch_env_frequency = 20
 
         
@@ -309,7 +308,8 @@ class Agent(nn.Module):
 
                     #plot_training_rewards(self)
                     #plot_training_loss(self)
-                    #plot_episode_reward(self)
+                    #plot_episode_reward(self)      
+
                     '''
                     actual_mean_reward = np.mean(list(self.training_reward[-window:])) 
 
@@ -318,13 +318,14 @@ class Agent(nn.Module):
                         old_mean_reward = actual_mean_reward
                         #self.save('end_episode.pt')
                     '''
+
                     if done_counter >= len(self.env_array):
                         self.epsilon *= self.epsilon_decay
 
                         if self.epsilon < self.epsilon_min:
                             self.epsilon = self.epsilon_min
                         break
-
+                    
            
             print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}], Switch: {}".format( e,
                                                                     max_epochs,
@@ -337,16 +338,18 @@ class Agent(nn.Module):
             for key, value in self.training_loss.items():
                 if len(value) > 0:
                     mean_loss.append( torch.mean(torch.stack(value[-window:]) ).item() )
-                    mean_loss = []
 
+            
             mean_reward = []
             for key, value in self.training_reward.items():
                 if len(value) > 0:
                     mean_reward.append(np.mean(np.stack(value[-window:]) ).item() )
-
-            print("Mean Rewards {},  Episode reward = [{}],  mean loss = [{}]".format(mean_reward, 
-                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
-                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) )))
+            
+            
+            print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format( mean_reward, 
+                                                                        ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
+                                                                        ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) ))
+                                                                                              )
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
 
@@ -361,7 +364,7 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-            self.save('model.pt')
+            self.model.save('model.pt')
 
     # how calculate loss
     def calculate_loss(self, state, action, next_state, reward, done, actual_id_env, beta, omega):
@@ -405,8 +408,8 @@ class Agent(nn.Module):
                 target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
                 loss_value = self.mse_loss(qval, torch.tensor(target_qval))
 
-        else:
-            old_pi = self.old_policy.forward(model_input)  # la media delle DKLs è relativa al tempo t ---> s(t)
+        else:                                           # la media delle DKLs è relativa al tempo t ---> s(t)
+            old_pi = self.old_policy.log_pi(model_input)# the output of the model must be computed with logSoftmax, not Softmax
             new_pi = self.model.forward(model_input)
             
             prediction_old = []
@@ -425,8 +428,8 @@ class Agent(nn.Module):
             old_pi_stacked_tensor = torch.stack(prediction_old, dim=0)
             actual_pi_stacked_tensor = torch.stack(prediction_actual, dim=0)
 
-            #loss_value = loss_ppo(self, new_pi, old_pi, beta, omega)
-            loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor, beta, omega)
+            loss_value = loss_ppo(self, new_pi, old_pi)
+            #loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor)
 
             #graph = make_dot(new_pi, params=dict(self.model.named_parameters()))
             #graph.render("computational_graph", format="png")  
@@ -442,10 +445,11 @@ class Agent(nn.Module):
             param.requires_grad = False
 
         self.old_policy.optimizer = None
-        
-        #loss_value = torch.tensor(loss_value.item(), requires_grad = True)
 
         self.training_loss[actual_id_env].append(loss_value)
+        
+        loss_value = torch.tensor(loss_value.item(), requires_grad = True)
+        print(f"loss_value: {loss_value}\n")
 
         loss_value.backward()
         self.model.optimizer.step()
