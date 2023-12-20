@@ -7,10 +7,12 @@ class Net(nn.Module):
     def __init__(self,  env1_id, env1_input, env1_outputs, 
                         env2_id, env2_input, env2_outputs, 
                         env3_id, env3_input, env3_outputs, 
-                        learning_rate, bias=False):
+                        learning_rate, device=None, bias=False):
 
 
         super(Net, self).__init__()
+
+        self.device = device
 
         self.env1_id = env1_id
         self.env2_id = env2_id
@@ -71,6 +73,7 @@ class Net(nn.Module):
         env_id = my_input['env_id']
 
         x = preprocess_image(x)
+        x = x.to(self.device)
 
         if env_id == self.env1_id:
             x = self.input_env1(x)

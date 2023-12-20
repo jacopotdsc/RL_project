@@ -98,7 +98,7 @@ class Agent(nn.Module):
         self.model           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
                                     env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
                                     env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
-                                    learning_rate=self.learning_rate).to(self.device) 
+                                    learning_rate=self.learning_rate, device=self.device).to(self.device) 
         
 
         self.old_policy = None
@@ -404,9 +404,9 @@ class Agent(nn.Module):
                 target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*next_qvals
                 loss_value= self.mse_loss(qvals, target_qvals)
             else:
-                qval = q_vals[action]
+                qval = q_vals[action].to(self.device)
                 target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
-                loss_value = self.mse_loss(qval, torch.tensor(target_qval))
+                loss_value = self.mse_loss(qval, torch.tensor(target_qval).to(self.device))
 
         else:
             old_pi = self.old_policy.forward(model_input)  # la media delle DKLs è relativa al tempo t ---> s(t)
