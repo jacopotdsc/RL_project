@@ -32,9 +32,11 @@ def loss_ppo(actual_id_env, actual_policy, old_policy, k=1):
     #result = -(1/k)*beta*(omega**(k-1))*kldiv_loss(actual_policy, old_policy) #.clone().detach().requires_grad_(True)
     beta = 2.0
     omega = 8.0
-    distance = beta * omega * kldiv_loss(actual_policy, old_policy)
+
+    kldiv_value =  kldiv_loss(actual_policy, old_policy)
+    distance = beta * omega * kldiv_value
     #print(f"id: {actual_id_env}, loss value: {distance}, mean act {torch.mean(actual_policy)}[{len(actual_policy)}],mean old {torch.mean(old_policy)}[{len(old_policy)}],  type: {type(distance)}\n")
-    #print("id: {}, loss value: {:.3f}, mean act {:.3f}[{}], mean old {:.3f}[{}], type: {}\n".format( actual_id_env, distance, torch.mean(actual_policy), len(actual_policy),torch.mean(old_policy), len(old_policy), type(distance).__name__))
+    #print("id: {}, kldiv: {:.3f} loss value: {:.3f}, mean act {:.3f}[{}], mean old {:.3f}[{}], type: {}\n".format( actual_id_env, kldiv_value, distance, torch.mean(actual_policy), len(actual_policy),torch.mean(old_policy), len(old_policy), type(distance).__name__))
     
     #print(f"ppo, total loss value: {distance}")
     return distance
