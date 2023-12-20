@@ -58,7 +58,7 @@ class Net(nn.Module):
 
         # implement dinamic choice with env_type in agent
         if x['env_id'] == self.env2_id:
-            probs = self.tan(q_val)
+            probs = self.softm(q_val)
         else:
             probs = self.softm(q_val)
 
@@ -107,8 +107,8 @@ class Net(nn.Module):
             param.requires_grad = gradient_value
 
     def save(self, name = 'model.pt' ):
-        #torch.save(self.state_dict(), name )
-        return
+        torch.save(self.state_dict(), name )
+        
 
     def load(self, name = 'model.pt'):
         self.load_state_dict(torch.load(name, map_location = self.device))

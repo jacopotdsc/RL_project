@@ -332,13 +332,12 @@ class Agent(nn.Module):
             
             mean_loss = []
             for key, value in self.training_loss.items():
-                print(f"{torch.stack(value[-window:])}")
-                #mean_loss.append( torch.mean(torch.stack(value[-window:]) ) )
+                if len(value) > 0:
+                    mean_loss.append( torch.mean(torch.stack(value[-window:]) ).item() )
 
-            print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = {:.3f}".format(mean_rewards, 
+            print("Mean Rewards {:.2f},  Episode reward = [{}],  mean loss = [{}]".format(mean_rewards, 
                                                                                               ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
-                                                                                              0)
-                                                                                              #mean_loss ) 
+                                                                                              ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) )))
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
 
