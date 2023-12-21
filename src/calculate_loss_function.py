@@ -3,9 +3,10 @@ import torch.nn as nn
 
 def total_loss(agent, actual_policy, old_policy, ADV_err, action, pi_1, k=3):
     kldiv_loss = nn.KLDivLoss(reduction="batchmean")
-    beta = 2
-    omega = 4.0
-    omega_12 = 2
+    beta = 0.5
+    omega = 2.0
+    omega_12 = 0.25
+    nn.KLDivLoss
     
     loss1 = loss_pg(actual_policy[0], pi_1, ADV_err, action)
     loss2 = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
@@ -25,7 +26,7 @@ def loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k=3):
     # k -----> set of policies used in Synaptic Consolidation
     loss = 0
     for i in range(0, k):
-        loss += -beta*(omega**(k))*kldiv_loss(old_policy[i], actual_policy[i]) 
+        loss += -beta*(omega**(i))*kldiv_loss(old_policy[i], actual_policy[i]) 
     # KLDiv(output of model, observated experience) ---> the output of the model must be computed with logSoftmax, not Softmax
     #print(f"PPO loss value: {loss}")
     return loss

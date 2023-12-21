@@ -19,7 +19,7 @@ from calculate_loss_function import *
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
-                    epsilon = 1.0, epsilon_min = 0.1, epsilon_decay  = 0.99,
+                    epsilon = 1.0, epsilon_min = 0.2, epsilon_decay  = 0.99,
                     learning_rate   = 0.001 ):
         
         super(Agent, self).__init__()
@@ -332,7 +332,7 @@ class Agent(nn.Module):
                     mean_reward.append( np.mean(np.stack(value[-window:])).item() )
             
             
-            print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format( mean_reward, 
+            print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format( ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_reward) )), 
                                                                         ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
                                                                         ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) ))
                                                                                               )
@@ -379,7 +379,7 @@ class Agent(nn.Module):
         next_model_input = self.model.create_model_input(next_state, actual_id_env)
         next_qvals = self.model.q_val(next_model_input)  # Q values estimated by the network of next state
          # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
-        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*next_qvals
+        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals) )
         old_pi = self.model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
         pi_1 = self.model.pi(q_vals)# this is the policy which we use to compute the PG Loss, must be computed with Softmax
         new_pi = self.model.pi(target_qvals)
@@ -393,7 +393,7 @@ class Agent(nn.Module):
         next_model_input2 = self.model2.create_model_input(next_state, actual_id_env)
         next_qvals2 = self.model2.q_val(next_model_input2)  # Q values estimated by the network 2 of next state
          # Q values computed by the network 2 with experience, "OBSERVATED EXPERIENCE"
-        target_qvals2 = reward*torch.ones( len(next_qvals2) ) + (1 - done)*self.gamma*next_qvals2
+        target_qvals2 = reward*torch.ones( len(next_qvals2) ) + (1 - done)*self.gamma*torch.max(next_qvals2, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals2) )
         old_pi2 = self.model2.log_pi(q_vals2)# the output predicted by the model 2 must be computed with logSoftmax, not Softmax
         new_pi2 = self.model2.pi(target_qvals2)
         vec_old_pi.append(old_pi2)
@@ -405,7 +405,7 @@ class Agent(nn.Module):
         next_model_input3 = self.model3.create_model_input(next_state, actual_id_env)
         next_qvals3 = self.model3.q_val(next_model_input3)  # Q values estimated by the network 3 of next state
          # Q values computed by the network 3 with experience, "OBSERVATED EXPERIENCE"
-        target_qvals3 = reward*torch.ones( len(next_qvals3) ) + (1 - done)*self.gamma*next_qvals3
+        target_qvals3 = reward*torch.ones( len(next_qvals3) ) + (1 - done)*self.gamma*torch.max(next_qvals3, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals3) )
         old_pi3 = self.model3.log_pi(q_vals3)# the output predicted by the model 3 must be computed with logSoftmax, not Softmax
         new_pi3 = self.model3.pi(target_qvals3)
         vec_old_pi.append(old_pi3)
