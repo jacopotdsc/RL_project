@@ -19,7 +19,7 @@ from calculate_loss_function import *
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
-                    epsilon = 1.0, epsilon_min = 0.2, epsilon_decay  = 0.99,
+                    epsilon = 1.0, epsilon_min = 0.1, epsilon_decay  = 0.99,
                     learning_rate   = 0.001 ):
         
         super(Agent, self).__init__()
@@ -31,9 +31,6 @@ class Agent(nn.Module):
         self.epsilon         = epsilon
         self.epsilon_min     = epsilon_min
         self.epsilon_decay   = epsilon_decay
-
-        self.beta            = 0.1  ## added by giordano
-        self.omega           = 0.25
 
         # loss functions
         self.learning_rate   = learning_rate
@@ -99,9 +96,19 @@ class Agent(nn.Module):
                                     env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
                                     env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
                                     learning_rate=self.learning_rate).to(self.device) 
+        self.model2           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
+                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
+                                    learning_rate=self.learning_rate).to(self.device)
+        self.model3           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
+                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
+                                    learning_rate=self.learning_rate).to(self.device)
         
 
-        self.old_policy = None
+        self.old_policy = deepcopy(self.model)
+        self.old_policy2 = deepcopy(self.model)
+        self.old_policy3 = deepcopy(self.model)
         
 
         # for plotting
@@ -120,8 +127,6 @@ class Agent(nn.Module):
         print(f"{self.env3_id}:\t input:{self.env3_input}, output:{self.env3_action}")
         print(f"Device: {self.device}")
 
-
-    # TODO: return action index -> used in evaluation
     def forward(self, x):
 
         model_input = self.model.create_model_input(x, self.evaluation_env)
@@ -129,7 +134,6 @@ class Agent(nn.Module):
 
         return action
 
-    # TODO: implement epsilon greedy
     def act(self, state, env_id, env_type = None):  
         
         '''
@@ -206,21 +210,13 @@ class Agent(nn.Module):
     def train(self):
        
         self.buffer = Buffer(self, memory_size=500, batch_size = 64)
-        max_epochs = 20
-        switch_env_frequency = 20
+        max_epochs = 300  
+        switch_env_frequency = 30
 
-        
         step_train = 0
-        calculate_loss_frequency = 5
 
         window = 50 
-        old_mean_reward = -999
         start_time = time.perf_counter()
-
-        # for CASC loss i need distribution at iteration 'k', 'k-1', 'k+1'
-        policy_distribution_env1 = {'actual':None, 'old-1':None, 'old-2':None}
-        policy_distribution_env2 = {'actual':None, 'old-1':None, 'old-2':None}
-        policy_distribution_env3 = {'actual':None, 'old-1':None, 'old-2':None}
 
         for e in range(max_epochs):
 
@@ -229,16 +225,14 @@ class Agent(nn.Module):
             env_step   = {}     # counter for switch
             env_done   = {}     # contain "done" enviroment
             env_reward = {}     # counter for reward
-            for env_id in self.env_array.keys():
 
+            for env_id in self.env_array.keys():
                 init_state, _ = self.env_array[env_id].reset()
                 env_states[env_id] = init_state
                 env_done[env_id]   = False
                 env_step[env_id]   = 0
                 env_reward[env_id] = 0
-
                 self.buffer.add(init_state, env_id)
-    
 
             env_index  = random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
             done_counter = 0    # use to terminate episode
@@ -262,7 +256,6 @@ class Agent(nn.Module):
                 state = env_states[ actual_id_env ]
                 action = self.act(state, actual_id_env) 
                 
-                
                 next_state, reward, terminated, truncated, _ = actual_env.step(action)
                 env_states[ actual_id_env ] = next_state
                 done = terminated or truncated  # truncated if fail to stand up -> penalize!
@@ -276,9 +269,10 @@ class Agent(nn.Module):
                 
                 self.buffer.add(next_state, actual_id_env)
 
-                if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and (step_train % calculate_loss_frequency) == 0:
-                    #print(f"enter {actual_id_env}, buffer size: {self.buffer.buffer_size(actual_id_env)}")
-                    self.calculate_loss(state, action, next_state, reward, done, actual_id_env, self.beta, self.omega)
+                #if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and (step_train % calculate_loss_frequency) == 0:
+                #    #print(f"enter {actual_id_env}, buffer size: {self.buffer.buffer_size(actual_id_env)}")
+                
+                self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
                 # terminate condition
                 if env_step[actual_id_env] >= 500: done = True
@@ -289,11 +283,11 @@ class Agent(nn.Module):
                     done_counter += 1
                     env_done[actual_id_env] = True
                 
-                    total_reward = np.array(list(env_reward.values())).sum()
+                    #total_reward = np.array(list(env_reward.values())).sum()
                     total_steps = np.array(list(env_step.values())).sum()
 
-                    self.training_reward[actual_id_env].append(total_reward)
-                    self.reward_episode.append(total_reward)
+                    self.training_reward[actual_id_env].append(env_reward[actual_id_env])
+                    self.reward_episode.append(env_reward[actual_id_env])
 
                     #mean_rewards = np.mean(self.training_reward[-window:])
                     #mean_loss    = np.mean(self.training_loss[-window:])
@@ -302,14 +296,6 @@ class Agent(nn.Module):
                     #print("Mean Rewards {:.2f},  Episode reward = {:.2f},  mean loss = {:.3f}".format(mean_rewards, env_reward[actual_id_env], mean_loss ) )
                     #print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
                     #print(f"Enviroment done: {actual_id_env}")
-
-                    
-
-
-                    #plot_training_rewards(self)
-                    #plot_training_loss(self)
-                    #plot_episode_reward(self)      
-
                     '''
                     actual_mean_reward = np.mean(list(self.training_reward[-window:])) 
 
@@ -337,13 +323,13 @@ class Agent(nn.Module):
             mean_loss = []
             for key, value in self.training_loss.items():
                 if len(value) > 0:
-                    mean_loss.append( torch.mean(torch.stack(value[-window:]) ).item() )
+                    mean_loss.append( torch.mean(torch.stack(value[-window:])).item() )
 
             
             mean_reward = []
             for key, value in self.training_reward.items():
                 if len(value) > 0:
-                    mean_reward.append(np.mean(np.stack(value[-window:]) ).item() )
+                    mean_reward.append( np.mean(np.stack(value[-window:])).item() )
             
             
             print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format( mean_reward, 
@@ -353,10 +339,6 @@ class Agent(nn.Module):
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
 
-            #plot_training_rewards(self)
-            #plot_training_loss(self)
-            #plot_episode_reward(self)
-
             end_time = time.perf_counter()
             elapsed_time = end_time - start_time
 
@@ -364,10 +346,10 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-            self.model.save('model.pt')
+        #self.model.save('model.pt')
 
     # how calculate loss
-    def calculate_loss(self, state, action, next_state, reward, done, actual_id_env, beta, omega):
+    def calculate_loss(self, state, action, next_state, reward, done, actual_id_env):
         self.model.optimizer.zero_grad()
         
         if actual_id_env == self.env1_id:
@@ -389,71 +371,96 @@ class Agent(nn.Module):
             self.model.set_gradient_layer( self.model.output_env2, False )
 
         #################### computation of actual policy
+        vec_old_pi = []
+        vec_new_pi = []
         
         model_input = self.model.create_model_input(state, actual_id_env)
-        q_vals = self.model.q_val(model_input)
-
+        q_vals = self.model.q_val(model_input)  # Q values estimated by the network, "PREDICTION"
         next_model_input = self.model.create_model_input(next_state, actual_id_env)
-        next_qvals = self.model.q_val(next_model_input)
+        next_qvals = self.model.q_val(next_model_input)  # Q values estimated by the network of next state
+         # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
+        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*next_qvals
+        old_pi = self.model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
+        pi_1 = self.model.pi(q_vals)# this is the policy which we use to compute the PG Loss, must be computed with Softmax
+        new_pi = self.model.pi(target_qvals)
+        ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
+        vec_old_pi.append(old_pi)
+        vec_new_pi.append(new_pi)
 
-        if self.old_policy is None:
-            # calculating td-error
-            if actual_id_env == self.env2_id:
-                qvals = q_vals#.detach().cpu()
-                next_qvals = next_qvals#.detach().cpu()
-                target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*next_qvals
-                loss_value= self.mse_loss(qvals, target_qvals)
-            else:
-                qval = q_vals[action]
-                target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
-                loss_value = self.mse_loss(qval, torch.tensor(target_qval))
+        ########## repeat for the network 2
+        model_input2 = self.model2.create_model_input(state, actual_id_env)
+        q_vals2 = self.model2.q_val(model_input2)  # Q values estimated by the network 2, "PREDICTION"
+        next_model_input2 = self.model2.create_model_input(next_state, actual_id_env)
+        next_qvals2 = self.model2.q_val(next_model_input2)  # Q values estimated by the network 2 of next state
+         # Q values computed by the network 2 with experience, "OBSERVATED EXPERIENCE"
+        target_qvals2 = reward*torch.ones( len(next_qvals2) ) + (1 - done)*self.gamma*next_qvals2
+        old_pi2 = self.model2.log_pi(q_vals2)# the output predicted by the model 2 must be computed with logSoftmax, not Softmax
+        new_pi2 = self.model2.pi(target_qvals2)
+        vec_old_pi.append(old_pi2)
+        vec_new_pi.append(new_pi2)
 
-        else:                                           # la media delle DKLs è relativa al tempo t ---> s(t)
-            old_pi = self.old_policy.log_pi(model_input)# the output of the model must be computed with logSoftmax, not Softmax
-            new_pi = self.model.forward(model_input)
-            
-            prediction_old = []
-            prediction_actual = []
-            batch = self.buffer.sample(actual_id_env)
+        ########## repeat for the network 3
+        model_input3 = self.model3.create_model_input(state, actual_id_env)
+        q_vals3 = self.model3.q_val(model_input3)  # Q values estimated by the network 3, "PREDICTION"
+        next_model_input3 = self.model3.create_model_input(next_state, actual_id_env)
+        next_qvals3 = self.model3.q_val(next_model_input3)  # Q values estimated by the network 3 of next state
+         # Q values computed by the network 3 with experience, "OBSERVATED EXPERIENCE"
+        target_qvals3 = reward*torch.ones( len(next_qvals3) ) + (1 - done)*self.gamma*next_qvals3
+        old_pi3 = self.model3.log_pi(q_vals3)# the output predicted by the model 3 must be computed with logSoftmax, not Softmax
+        new_pi3 = self.model3.pi(target_qvals3)
+        vec_old_pi.append(old_pi3)
+        vec_new_pi.append(new_pi3)
 
-            #print(f"batch size: {len(batch)}, sample: {batch[0].shape}")
+        loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
 
-            for sample in batch:
+        #if self.old_policy is None:
+        #    # calculating td-error
+        #    if actual_id_env == self.env2_id:
+        #        qvals = q_vals#.detach().cpu()
+        #        next_qvals = next_qvals#.detach().cpu()
+        #        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*next_qvals
+        #        loss_value= self.mse_loss(qvals, target_qvals)
+        #    else:
+        #        qval = q_vals[action]
+        #        target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
+        #        loss_value = self.mse_loss(qval, torch.tensor(target_qval))
 
-                new_model_input = self.model.create_model_input(sample, actual_id_env)
-                #print(f"model input: {new_model_input}")
-                prediction_old.append( self.old_policy.forward(new_model_input) )
-                prediction_actual.append( self.model.forward(new_model_input) )
+        #else:                                           # la media delle DKLs è relativa al tempo t ---> s(t)
+        #    old_pi = self.old_policy.log_pi(model_input)# the output of the model must be computed with logSoftmax, not Softmax
+        #    new_pi = self.model.forward(model_input)
 
-            old_pi_stacked_tensor = torch.stack(prediction_old, dim=0)
-            actual_pi_stacked_tensor = torch.stack(prediction_actual, dim=0)
-
-            loss_value = loss_ppo(self, new_pi, old_pi)
-            #loss_value = loss_ppo(actual_id_env, actual_pi_stacked_tensor, old_pi_stacked_tensor)
-
-            #graph = make_dot(new_pi, params=dict(self.model.named_parameters()))
-            #graph.render("computational_graph", format="png")  
-            
-            #print(f"old policy: {old_pi}")
-            #print(f"new policy: {new_pi}")
-            #print(f"id: {actual_id_env}, loss value: {loss_value}, type: {type(loss_value)}\n")
+        #    loss_value = loss_ppo(self, new_pi, old_pi)
 
 
-        # keeping the record of my policy
+        # keeping the record of my policies
         self.old_policy = deepcopy(self.model)
+        self.old_policy2 = deepcopy(self.model2)
+        self.old_policy3 = deepcopy(self.model3)
         for param in self.old_policy.parameters():
             param.requires_grad = False
-
+        for param in self.old_policy2.parameters():
+            param.requires_grad = False
+        for param in self.old_policy3.parameters():
+            param.requires_grad = False
         self.old_policy.optimizer = None
+        self.old_policy2.optimizer = None
+        self.old_policy3.optimizer = None
+        
 
         self.training_loss[actual_id_env].append(loss_value)
         
         loss_value = torch.tensor(loss_value.item(), requires_grad = True)
-        print(f"loss_value: {loss_value}\n")
+        #print(f"loss_value: {loss_value}\n")
 
         loss_value.backward()
+
         self.model.optimizer.step()
+        self.model2.optimizer.step()
+        self.model3.optimizer.step()
+
         self.model.optimizer.zero_grad()
+        self.model2.optimizer.zero_grad()
+        self.model3.optimizer.zero_grad()
        
 
 

@@ -65,16 +65,12 @@ class Net(nn.Module):
 
         return probs
 
-    def log_pi(self, x):
-
-        q_val = self.q_val(x)
-
-        # implement dinamic choice with env_type in agent
-        if x['env_id'] == self.env2_id:
-            probs = self.log_soft(q_val)
-        else:
-            probs = self.log_soft(q_val)
-
+    def log_pi(self, q_val):
+        probs = self.log_soft(q_val)
+        return probs
+    
+    def pi(self, q_val):
+        probs = self.softm(q_val)
         return probs
 
     # return the q-value -> input = ( x, env_id )
