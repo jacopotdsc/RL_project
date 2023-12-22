@@ -7,12 +7,12 @@ class Net(nn.Module):
     def __init__(self,  env1_id, env1_input, env1_outputs, 
                         env2_id, env2_input, env2_outputs, 
                         env3_id, env3_input, env3_outputs, 
-                        learning_rate, device=None, bias=False):
+                        learning_rate, encoder = None, bias=True):
 
 
         super(Net, self).__init__()
 
-        self.device = device
+        self.encoder = encoder
 
         self.env1_id = env1_id
         self.env2_id = env2_id
@@ -30,16 +30,22 @@ class Net(nn.Module):
         self.relu    = nn.ReLU()
         self.tan     = nn.Tanh()
         self.softm   = nn.Softmax(dim=-1)
+        self.log_soft = nn.LogSoftmax(dim=-1)
 
         # input layers
-        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=16, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=16, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=16, bias=bias)
+        self.input_env1 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
 
-        # hidden layers                  
-        self.hl1 = nn.Linear(in_features=16,  out_features=64, bias=bias) 
-        self.hl2 = nn.Linear(in_features=64, out_features=16, bias=bias) 
-        #self.hl3 = nn.Linear(in_features=216, out_features=32,  bias=bias) 
+        # hidden layers   
+        self.hidden_size = 256   
+
+        self.hl1 = nn.Linear(in_features=16, out_features=self.hidden_size, bias=bias) 
+        self.hl2 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
+        self.hl3 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
+        self.hl4 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
+        self.hl_fin = nn.Linear(in_features=self.hidden_size, out_features=16, bias=bias) 
+
 
         # output layers: one for each enviroment
         self.output_env1 = nn.Linear(in_features=16, out_features=self.env1_outputs, bias=bias)
@@ -66,14 +72,21 @@ class Net(nn.Module):
 
         return probs
 
+    def log_pi(self, q_val):
+        probs = self.log_soft(q_val)
+        return probs
+    
+    def pi(self, q_val):
+        probs = self.softm(q_val)
+        return probs
+
     # return the q-value -> input = ( x, env_id )
     def q_val(self, my_input):
 
         x = my_input['state']
         env_id = my_input['env_id']
 
-        x = preprocess_image(x)
-        x = x.to(self.device)
+        x = preprocess(self, my_input)
 
         if env_id == self.env1_id:
             x = self.input_env1(x)
@@ -86,10 +99,14 @@ class Net(nn.Module):
         
         x = self.hl1(x)
         x = self.relu(x)
-        x = self.hl2(x)
+        x = self.hl2(x) + x
         x = self.relu(x)
-        #x = self.hl3(x)
-        #x = self.relu(x)
+        x = self.hl3(x) + x
+        x = self.relu(x)
+        x = self.hl4(x) + x
+        x = self.relu(x)
+        x = self.hl_fin(x)
+        x = self.relu(x)
         
         if env_id == self.env1_id:
             x = self.output_env1(x)
