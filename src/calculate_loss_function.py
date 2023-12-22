@@ -13,7 +13,6 @@ def total_loss(agent, actual_policy, old_policy, ADV_err, action, pi_1, k=3):
     loss = loss1 + loss2 + loss3
     #print(f"Total loss value: {loss}\n")
 
-    loss = loss1
     return loss
 
 

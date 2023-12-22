@@ -133,6 +133,7 @@ class Net(nn.Module):
 
     def load(self, name = 'model.pt'):
         self.load_state_dict(torch.load(name,  map_location=self.device) )
+        print(f"loaded: {name}")
          
     def to(self, device):
         ret = super().to(device)

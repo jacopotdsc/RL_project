@@ -8,7 +8,7 @@ def evaluate(env=None, n_episodes=1, render=False):
     
     agent = Agent(env)
     print(f"\nplaying env: {env}\n")
-    agent.model.load()
+    agent.model.load('training_progress.pt')
 
     #env = gym.make('CarRacing-v2', continuous=agent.continuous)
     #if render:

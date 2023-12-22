@@ -212,11 +212,16 @@ class Agent(nn.Module):
         switch_env_frequency = 30
 
         step_train = 0
+        negative_reward_tollerance = 100
 
         window = 50 
         start_time = time.perf_counter()
 
         for e in range(max_epochs):
+
+            negative_reward = {    self.env1_id: 0, 
+                                    self.env2_id: 0, 
+                                    self.env3_id: 0 }
 
             # create dictionary for switching easier between states of enviroments
             env_states = {}     # contain state to pass when callicng act
@@ -260,9 +265,16 @@ class Agent(nn.Module):
                 
                 if torch.is_tensor(reward): reward = reward.item()
                 reward = float(reward)
+
+                if reward < 0:
+                    negative_reward[actual_id_env]
                 
+                if negative_reward[actual_id_env] > negative_reward_tollerance:
+                    reward = -20.0
+
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
+
 
                 self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
@@ -323,10 +335,15 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-        #self.model.save('model.pt')
+            self.model.save('training_progress_total_loss.pt')
+
+        self.model.save('model_train_finished_total_loss.pt')
 
 
     def calculate_loss_input(self, my_model, state, next_state, reward, done, action, actual_id_env, pg_flag = False):
+
+        if reward > 0:
+            reward = reward*1.5
 
         model_input = my_model.create_model_input(state, actual_id_env)
         q_vals = my_model.q_val(model_input)  # Q values estimated by the network, "PREDICTION"
