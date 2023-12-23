@@ -206,6 +206,37 @@ class Agent(nn.Module):
                 
                 return actual_env, actual_id_env, env_index
 
+    def custom_reset_enviroment(self, id_enviroment, step_ahead = None):
+        # it will reset in a certain state.
+        # it will continue to reset enviroment until it doesn't reach a state at least
+        # steap_ahed steps ahead to the initial state
+
+        resetted = False
+        state_returned = None
+
+        if self.env1_id == id_enviroment:
+            step_ahead = 20
+        elif self.env2_id == id_enviroment:
+            step_ahead = 10
+        elif self.env3_id == id_enviroment:
+            step_ahead = 3
+
+        while not resetted:
+            self.env_array[id_enviroment].reset()
+            action = random.randint(0, self.env_array[id_enviroment].action_space.n -1)
+
+            step_counter = 0
+            while step_counter < step_ahead:
+                step_counter += 1
+                state_returned, reward, terminated, truncated, _ = self.env_array[id_enviroment].step(action)
+                done = terminated or truncated 
+
+                #print(f"id_enviroment: {id_enviroment}, done: {done}, step_counter: {step_counter}")
+                if done:
+                    break
+                if step_counter >= step_ahead:
+                    return state_returned, None
+
     def train(self):
        
         max_epochs = 300  
@@ -230,7 +261,13 @@ class Agent(nn.Module):
             env_reward = {}     # counter for reward
 
             for env_id in self.env_array.keys():
-                init_state, _ = self.env_array[env_id].reset()
+                #init_state, _ = self.env_array[env_id].reset()
+                #init_state, _ = self.custom_reset_enviroment( env_id )
+                if np.random.uniform(0,1) < 0.2:
+                    init_state, _ = self.env_array[env_id].reset()
+                else:
+                    init_state, _ = self.custom_reset_enviroment( env_id )
+
                 env_states[env_id] = init_state
                 env_done[env_id]   = False
                 env_step[env_id]   = 0
@@ -247,7 +284,7 @@ class Agent(nn.Module):
 
             done = False    
             n_iteration = 0  
-            update_frequency = 30   
+            update_frequency = 10   
 
             while True:
                 n_iteration += 1
@@ -283,7 +320,8 @@ class Agent(nn.Module):
 
                 self.buffer.add( actual_id_env, state, action, reward, next_state, done  )
 
-                if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and ( n_iteration  % update_frequency ) == 0:  # implemented update frequency
+                # updated based of enviroment
+                if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and ( env_step[actual_id_env]  % update_frequency ) == 0:  # implemented update frequency
                     self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
                 # terminate condition
@@ -520,7 +558,7 @@ class Agent(nn.Module):
     def load(self, name = 'model.pt'):
         #self.load_state_dict(torch.load("../model_folder/"+name,  map_location=self.device) )
         self.model.load(name)
-        
+
     def to(self, device):
         ret = super().to(device)
         ret.device = device
