@@ -19,7 +19,7 @@ from calculate_loss_function import *
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
-                    epsilon = 1.0, epsilon_min = 0.2, epsilon_decay  = 0.99,
+                    epsilon = 0.4, epsilon_min = 0.2, epsilon_decay  = 0.99,
                     learning_rate   = 0.0001 ):
         
         super(Agent, self).__init__()
@@ -215,7 +215,7 @@ class Agent(nn.Module):
         state_returned = None
 
         if self.env1_id == id_enviroment:
-            step_ahead = 20
+            step_ahead = 40
         elif self.env2_id == id_enviroment:
             step_ahead = 10
         elif self.env3_id == id_enviroment:
@@ -239,8 +239,7 @@ class Agent(nn.Module):
 
     def train(self):
        
-        max_epochs = 300  
-        switch_env_frequency = 30
+        max_epochs = 300 
         self.buffer = Buffer(self, memory_size=5000)
 
         negative_reward_tollerance = 100
@@ -248,11 +247,12 @@ class Agent(nn.Module):
         window = 50 
         start_time = time.perf_counter()
 
+        env_index  = 0 #random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
         for e in range(max_epochs):
 
             counter_negative_reward = {  self.env1_id: 0, 
-                                    self.env2_id: 0, 
-                                    self.env3_id: 0 }
+                                         self.env2_id: 0, 
+                                         self.env3_id: 0 }
 
             # create dictionary for switching easier between states of enviroments
             env_states = {}     # contain state to pass when callicng act
@@ -261,12 +261,8 @@ class Agent(nn.Module):
             env_reward = {}     # counter for reward
 
             for env_id in self.env_array.keys():
-                #init_state, _ = self.env_array[env_id].reset()
+                init_state, _ = self.env_array[env_id].reset()
                 #init_state, _ = self.custom_reset_enviroment( env_id )
-                if np.random.uniform(0,1) < 0.2:
-                    init_state, _ = self.env_array[env_id].reset()
-                else:
-                    init_state, _ = self.custom_reset_enviroment( env_id )
 
                 env_states[env_id] = init_state
                 env_done[env_id]   = False
@@ -274,26 +270,23 @@ class Agent(nn.Module):
                 env_reward[env_id] = 0
                 
 
-            env_index  = random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
-            done_counter = 0    # use to terminate episode
             switch_counter = 0  # plotting purporse
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
-            actual_id_env = env_ids[env_index]       # contain id of the actual enviroment
+            actual_id_env = env_ids[env_index % len(env_ids)]       # contain id of the actual enviroment
             actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
 
             done = False    
-            n_iteration = 0  
-            update_frequency = 10   
+            switch_env_frequency = 30
+
+
+            if e % switch_env_frequency == 0 and e > 0:
+                print(f"\nold enviroment: {actual_id_env}")
+                actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
+                switch_counter += 1
+                print(f"new enviroment: {actual_id_env}")
 
             while True:
-                n_iteration += 1
-
-                if env_step[actual_id_env] % switch_env_frequency == 0 or done == True:
-                    #print(f"old: {actual_id_env}")
-                    actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
-                    switch_counter += 1
-                    #print(f"new: {actual_id_env}\n")
 
                 state = env_states[ actual_id_env ]
                 action = self.act(state, actual_id_env) 
@@ -305,6 +298,7 @@ class Agent(nn.Module):
                 if torch.is_tensor(reward): reward = reward.item()
                 reward = float(reward)
 
+                '''
                 if reward < 0:
                     counter_negative_reward[actual_id_env] += 1
                 
@@ -312,26 +306,22 @@ class Agent(nn.Module):
                     reward = -5.0
                 elif actual_id_env == self.env2_id and counter_negative_reward[self.env2_id] > 40:
                     reward = -5.0
-                elif actual_id_env == self.env3_id and env_step[self.env3_id] < 20:
+                elif actual_id_env == self.env3_id and env_step[self.env3_id] < 15:
                     reward = 0
+                '''
 
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
 
-                self.buffer.add( actual_id_env, state, action, reward, next_state, done  )
-
-                # updated based of enviroment
-                if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and ( env_step[actual_id_env]  % update_frequency ) == 0:  # implemented update frequency
-                    self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
-
-                # terminate condition
-                if env_step[actual_id_env] >= 500: done = True
+                #self.buffer.add( actual_id_env, state, action, reward, next_state, done  )
+                #if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and ( env_step[actual_id_env]  % update_frequency ) == 0:  # implemented update frequency
+                #    self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
+                self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
                 # plot statstics
                 if done:
 
-                    done_counter += 1
-                    env_done[actual_id_env] = True
+                    #env_done[actual_id_env] = True
                 
                     #total_reward = np.array(list(env_reward.values())).sum()
                     total_steps = np.array(list(env_step.values())).sum()
@@ -339,17 +329,25 @@ class Agent(nn.Module):
                     self.training_reward[actual_id_env].append(env_reward[actual_id_env])
                     self.reward_episode.append(env_reward[actual_id_env])
 
+                    #self.epsilon *= self.epsilon_decay
 
+                    #if self.epsilon < self.epsilon_min:
+                        #self.epsilon = self.epsilon_min
+
+                    if done:
+                        break
+                    '''
                     if done_counter >= len(self.env_array):
                         self.epsilon *= self.epsilon_decay
 
                         if self.epsilon < self.epsilon_min:
                             self.epsilon = self.epsilon_min
                         break
+                    '''
                     
            
-            print("\nEpisode {:d}/{:d}, \nid: [{}], \nStep: [{}], Switch: {}".format( e,
-                                                                    max_epochs,
+            print("\nEpisode {:d}/{:d}, id: {}\nids: [{}], \nStep: [{}], Switch: {}".format( e,
+                                                                    max_epochs, actual_id_env,
                                                                     ', '.join( map(str,list(self.env_array.keys()) )), 
                                                                     ', '.join( map(str,list(env_step.values()) )),
                                                                     switch_counter
@@ -388,8 +386,8 @@ class Agent(nn.Module):
 
     def calculate_loss_input(self, my_model, state, next_state, reward, done, action, actual_id_env, pg_flag = False):
 
-        if reward > 0:
-            reward = reward*1.5
+        #if reward > 0:
+        #    reward = reward*1.5
 
         model_input = my_model.create_model_input(state, actual_id_env)
         q_vals = my_model.q_val(model_input)  # Q values estimated by the network, "PREDICTION"
@@ -436,49 +434,10 @@ class Agent(nn.Module):
         #################### computation of actual policy
         vec_old_pi = []
         vec_new_pi = []
-
-        '''
-        
-        model_input = self.model.create_model_input(state, actual_id_env)
-        q_vals = self.model.q_val(model_input)  # Q values estimated by the network, "PREDICTION"
-        next_model_input = self.model.create_model_input(next_state, actual_id_env)
-        next_qvals = self.model.q_val(next_model_input)  # Q values estimated by the network of next state
-         # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
-        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals) )
-        old_pi = self.model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
-        pi_1 = self.model.pi(q_vals)# this is the policy which we use to compute the PG Loss, must be computed with Softmax
-        new_pi = self.model.pi(target_qvals)
-        ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
-        vec_old_pi.append(old_pi)
-        vec_new_pi.append(new_pi)
-
-        ########## repeat for the network 2
-        model_input2 = self.model2.create_model_input(state, actual_id_env)
-        q_vals2 = self.model2.q_val(model_input2)  # Q values estimated by the network 2, "PREDICTION"
-        next_model_input2 = self.model2.create_model_input(next_state, actual_id_env)
-        next_qvals2 = self.model2.q_val(next_model_input2)  # Q values estimated by the network 2 of next state
-         # Q values computed by the network 2 with experience, "OBSERVATED EXPERIENCE"
-        target_qvals2 = reward*torch.ones( len(next_qvals2) ) + (1 - done)*self.gamma*torch.max(next_qvals2, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals2) )
-        old_pi2 = self.model2.log_pi(q_vals2)# the output predicted by the model 2 must be computed with logSoftmax, not Softmax
-        new_pi2 = self.model2.pi(target_qvals2)
-        vec_old_pi.append(old_pi2)
-        vec_new_pi.append(new_pi2)
-
-        ########## repeat for the network 3
-        model_input3 = self.model3.create_model_input(state, actual_id_env)
-        q_vals3 = self.model3.q_val(model_input3)  # Q values estimated by the network 3, "PREDICTION"
-        next_model_input3 = self.model3.create_model_input(next_state, actual_id_env)
-        next_qvals3 = self.model3.q_val(next_model_input3)  # Q values estimated by the network 3 of next state
-         # Q values computed by the network 3 with experience, "OBSERVATED EXPERIENCE"
-        target_qvals3 = reward*torch.ones( len(next_qvals3) ) + (1 - done)*self.gamma*torch.max(next_qvals3, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals3) )
-        old_pi3 = self.model3.log_pi(q_vals3)# the output predicted by the model 3 must be computed with logSoftmax, not Softmax
-        new_pi3 = self.model3.pi(target_qvals3)
-        vec_old_pi.append(old_pi3)
-        vec_new_pi.append(new_pi3)
-        '''
-
-        batch = self.buffer.sample(actual_id_env)
         loss_value = None
+
+        '''
+        batch = self.buffer.sample(actual_id_env)
         for sample in batch:
 
             state, action, reward, next_state, done = sample
@@ -493,7 +452,18 @@ class Agent(nn.Module):
             loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1) if loss_value is None else loss_value + total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
 
         loss_value = loss_value / self.buffer.batch_size
-        
+        '''
+
+        old_pi, new_pi, pi_1, ADV_err  = self.calculate_loss_input(self.model,  state, next_state, reward, done, action, actual_id_env, pg_flag = True)
+        old_pi_2, new_pi_2, _, _       = self.calculate_loss_input(self.model2, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
+        old_pi_3, new_pi_3, _, _       = self.calculate_loss_input(self.model3, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
+
+        vec_old_pi.append(old_pi);    vec_old_pi.append(old_pi_2);  vec_old_pi.append(old_pi_3)
+        vec_new_pi.append(new_pi);    vec_new_pi.append(new_pi_2);  vec_new_pi.append(new_pi_3)
+
+        loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1) if loss_value is None else loss_value + total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
+
+
         # keeping the record of my policies
         self.old_policy  = deepcopy(self.model)
         self.old_policy2 = deepcopy(self.model2)

@@ -32,25 +32,22 @@ class Net(nn.Module):
         self.softm   = nn.Softmax(dim=-1)
         self.log_soft = nn.LogSoftmax(dim=-1)
 
+        self.hidden_size = 64
+
         # input layers
-        self.input_env1 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
+        self.input_env1 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
 
         # hidden layers   
-        self.hidden_size = 100 
-
-        self.hl1 = nn.Linear(in_features=16, out_features=self.hidden_size, bias=bias) 
-        self.hl2 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
-        self.hl3 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
-        self.hl4 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
-        self.hl_fin = nn.Linear(in_features=self.hidden_size, out_features=16, bias=bias) 
+        self.hl1    = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
+        self.hl_fin = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
 
 
         # output layers: one for each enviroment
-        self.output_env1 = nn.Linear(in_features=16, out_features=self.env1_outputs, bias=bias)
-        self.output_env2 = nn.Linear(in_features=16, out_features=self.env2_outputs, bias=bias)
-        self.output_env3 = nn.Linear(in_features=16, out_features=self.env3_outputs, bias=bias)
+        self.output_env1 = nn.Linear(in_features=self.hidden_size, out_features=self.env1_outputs, bias=bias)
+        self.output_env2 = nn.Linear(in_features=self.hidden_size, out_features=self.env2_outputs, bias=bias)
+        self.output_env3 = nn.Linear(in_features=self.hidden_size, out_features=self.env3_outputs, bias=bias)
 
 
         # optimizer -> check how it work values
@@ -98,12 +95,6 @@ class Net(nn.Module):
             x = self.input_env3(x)
         
         x = self.hl1(x)
-        x = self.relu(x)
-        x = self.hl2(x) + x
-        x = self.relu(x)
-        x = self.hl3(x) + x
-        x = self.relu(x)
-        x = self.hl4(x) + x
         x = self.relu(x)
         x = self.hl_fin(x)
         x = self.relu(x)

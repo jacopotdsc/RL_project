@@ -3,16 +3,18 @@ import torch.nn as nn
 
 def total_loss(agent, actual_policy, old_policy, ADV_err, action, pi_1, k=3):
     kldiv_loss = nn.KLDivLoss(reduction="batchmean")
+
     beta = 0.5
     omega = 2.0
     omega_12 = 0.25
     
-    loss1 = loss_pg(actual_policy[0], pi_1, ADV_err, action)
-    loss2 = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
-    loss3 = loss_casc(kldiv_loss, actual_policy, old_policy, omega, omega_12, k)
-    loss = loss1 + loss2 + loss3
+    value_loss_pg   = loss_pg(actual_policy[0], pi_1, ADV_err, action)
+    value_loss_ppo  = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
+    value_loss_casc = loss_casc(kldiv_loss, actual_policy, old_policy, omega, omega_12, k)
+    #loss = value_loss_pg + value_loss_ppo + value_loss_casc
     #print(f"Total loss value: {loss}\n")
 
+    loss = value_loss_ppo
     return loss
 
 
@@ -29,6 +31,7 @@ def loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k=3):
     loss = 0
     beta = 8.0
     omega = 4.0
+
     for i in range(0, k):
         loss += -beta*(omega**(i))*kldiv_loss(old_policy[i], actual_policy[i]) 
     # KLDiv(output of model, observated experience) ---> the output of the model must be computed with logSoftmax, not Softmax
