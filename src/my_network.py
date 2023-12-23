@@ -38,7 +38,7 @@ class Net(nn.Module):
         self.input_env3 = nn.Linear(in_features=self.encoder.size, out_features=16, bias=bias)
 
         # hidden layers   
-        self.hidden_size = 256   
+        self.hidden_size = 100 
 
         self.hl1 = nn.Linear(in_features=16, out_features=self.hidden_size, bias=bias) 
         self.hl2 = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
@@ -113,7 +113,7 @@ class Net(nn.Module):
 
         elif env_id == self.env2_id:
             x = self.output_env2(x)
-            x = torch.clamp(x, min=-2.0, max=2.0)
+            #x = torch.clamp(x, min=-2.0, max=2.0)
 
         elif env_id == self.env3_id :
             x = self.output_env3(x)
@@ -129,10 +129,10 @@ class Net(nn.Module):
     # Utility functions
     def save(self, name = 'model.pt' ):
         print("saving weight model")
-        torch.save(self.state_dict(), name )
+        torch.save(self.state_dict(), "../model_folder/" + name )
 
     def load(self, name = 'model.pt'):
-        self.load_state_dict(torch.load(name,  map_location=self.device) )
+        self.load_state_dict(torch.load("../model_folder/" + name,  map_location=self.device) )
         print(f"loaded: {name}")
          
     def to(self, device):

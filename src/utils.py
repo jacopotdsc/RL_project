@@ -17,20 +17,21 @@ class Buffer:
         self.agent = agent
         self.batch_size = batch_size
         self.memory_size = memory_size
+        self.named_sample = namedtuple('NamedSample',
+                                field_names=['state', 'action', 'reward', 'next_state', 'done'])
         
         self.buffer_env1  = deque(maxlen=memory_size)
         self.buffer_env2  = deque(maxlen=memory_size)
         self.buffer_env3  = deque(maxlen=memory_size)
         
         
-    def add(self, state, env_id):
+    def add(self, env_id, state, action, reward, next_state, done):
 
-        #self.replay_memory.append( self.Buffer(state) ) 
+        sample = self.named_sample(state, action, reward, next_state, done)
         
-        if env_id == self.agent.env1_id: self.buffer_env1.append(state)
-        elif env_id == self.agent.env2_id: self.buffer_env2.append(state)
-        elif env_id == self.agent.env3_id: self.buffer_env3.append(state)
-
+        if env_id == self.agent.env1_id: self.buffer_env1.append( sample )
+        elif env_id == self.agent.env2_id: self.buffer_env2.append( sample )
+        elif env_id == self.agent.env3_id: self.buffer_env3.append( sample )
 
     def sample(self, env_id):
         
@@ -55,6 +56,7 @@ class Buffer:
         
         elif env_id == self.agent.env3_id: 
              return len(self.buffer_env3)
+
 
 class RBFFeatureEncoder:
     def __init__(self, env1, env2, env3, n_component=100): 

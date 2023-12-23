@@ -210,8 +210,8 @@ class Agent(nn.Module):
        
         max_epochs = 300  
         switch_env_frequency = 30
+        self.buffer = Buffer(self, memory_size=5000)
 
-        step_train = 0
         negative_reward_tollerance = 100
 
         window = 50 
@@ -219,7 +219,7 @@ class Agent(nn.Module):
 
         for e in range(max_epochs):
 
-            negative_reward = {    self.env1_id: 0, 
+            counter_negative_reward = {  self.env1_id: 0, 
                                     self.env2_id: 0, 
                                     self.env3_id: 0 }
 
@@ -245,10 +245,12 @@ class Agent(nn.Module):
             actual_id_env = env_ids[env_index]       # contain id of the actual enviroment
             actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
 
-            done = False            
+            done = False    
+            n_iteration = 0  
+            update_frequency = 30   
 
             while True:
-                step_train += 1
+                n_iteration += 1
 
                 if env_step[actual_id_env] % switch_env_frequency == 0 or done == True:
                     #print(f"old: {actual_id_env}")
@@ -267,16 +269,22 @@ class Agent(nn.Module):
                 reward = float(reward)
 
                 if reward < 0:
-                    negative_reward[actual_id_env]
+                    counter_negative_reward[actual_id_env] += 1
                 
-                if negative_reward[actual_id_env] > negative_reward_tollerance:
-                    reward = -20.0
+                if actual_id_env == self.env1_id and counter_negative_reward[self.env1_id] > 100:
+                    reward = -5.0
+                elif actual_id_env == self.env2_id and counter_negative_reward[self.env2_id] > 40:
+                    reward = -5.0
+                elif actual_id_env == self.env3_id and env_step[self.env3_id] < 20:
+                    reward = 0
 
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
 
+                self.buffer.add( actual_id_env, state, action, reward, next_state, done  )
 
-                self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
+                if self.buffer.buffer_size(actual_id_env) >= self.buffer.batch_size and ( n_iteration  % update_frequency ) == 0:  # implemented update frequency
+                    self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
                 # terminate condition
                 if env_step[actual_id_env] >= 500: done = True
@@ -431,15 +439,23 @@ class Agent(nn.Module):
         vec_new_pi.append(new_pi3)
         '''
 
-        old_pi, new_pi, pi_1, ADV_err  = self.calculate_loss_input(self.model,  state, next_state, reward, done, action, actual_id_env, pg_flag = True)
-        old_pi_2, new_pi_2, _, _       = self.calculate_loss_input(self.model2, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
-        old_pi_3, new_pi_3, _, _       = self.calculate_loss_input(self.model3, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
+        batch = self.buffer.sample(actual_id_env)
+        loss_value = None
+        for sample in batch:
 
-        vec_old_pi.append(old_pi);    vec_old_pi.append(old_pi_2);  vec_old_pi.append(old_pi_3)
-        vec_new_pi.append(new_pi);    vec_new_pi.append(new_pi_2);  vec_new_pi.append(new_pi_3)
+            state, action, reward, next_state, done = sample
 
-        loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
+            old_pi, new_pi, pi_1, ADV_err  = self.calculate_loss_input(self.model,  state, next_state, reward, done, action, actual_id_env, pg_flag = True)
+            old_pi_2, new_pi_2, _, _       = self.calculate_loss_input(self.model2, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
+            old_pi_3, new_pi_3, _, _       = self.calculate_loss_input(self.model3, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
 
+            vec_old_pi.append(old_pi);    vec_old_pi.append(old_pi_2);  vec_old_pi.append(old_pi_3)
+            vec_new_pi.append(new_pi);    vec_new_pi.append(new_pi_2);  vec_new_pi.append(new_pi_3)
+
+            loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1) if loss_value is None else loss_value + total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
+
+        loss_value = loss_value / self.buffer.batch_size
+        
         # keeping the record of my policies
         self.old_policy  = deepcopy(self.model)
         self.old_policy2 = deepcopy(self.model2)
@@ -498,11 +514,13 @@ class Agent(nn.Module):
 
     # Utility functions
     def save(self, name = 'model.pt' ):
-        torch.save(self.state_dict(), name )
+        #torch.save(self.state_dict(), "../model_folder/"+name )
+        self.model.save(name)
 
     def load(self, name = 'model.pt'):
-        self.load_state_dict(torch.load(name,  map_location=self.device) )
-         
+        #self.load_state_dict(torch.load("../model_folder/"+name,  map_location=self.device) )
+        self.model.load(name)
+        
     def to(self, device):
         ret = super().to(device)
         ret.device = device
