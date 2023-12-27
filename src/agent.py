@@ -43,7 +43,7 @@ class Agent(nn.Module):
         self.action_type_discrete   = 'Discrete'
         self.action_type_continuous = 'Continuous'
 
-        self.env1_id     = 'MountainCar-v0' #'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
+        self.env1_id     = 'Acrobot-v1'  #'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
         self.env1        = gym.make(self.env1_id, render_mode=self.render)  # gym.make('HalfCheetah-v2')
         obs1_shape       = self.env1.observation_space.shape
         self.env1_input  = obs1_shape[0] if len(obs1_shape) == 1 else obs1_shape[0]*obs1_shape[1]
@@ -277,7 +277,7 @@ class Agent(nn.Module):
             actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
 
             done = False    
-            switch_env_frequency = 30
+            switch_env_frequency = 100
 
 
             if e % switch_env_frequency == 0 and e > 0:
