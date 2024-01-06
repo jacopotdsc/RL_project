@@ -8,7 +8,7 @@ def evaluate(env=None, n_episodes=1, render=False):
     
     agent = Agent(env)
     print(f"\nplaying env: {env}\n")
-    agent.model.load()
+    agent.model.load('training_progress_total_loss.pt')
 
     #env = gym.make('CarRacing-v2', continuous=agent.continuous)
     #if render:
@@ -22,13 +22,17 @@ def evaluate(env=None, n_episodes=1, render=False):
         total_reward = 0
         done = False
         s, _ = env.reset()
+        step = 0
         while not done:
+            step += 1
             action = torch.argmax(agent.forward(s)).item()
             
             s, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
+            
             total_reward += reward
         
+        print(f"enviroment terminated after: {step}")
         rewards.append(total_reward)
         
     print('Mean Reward:', np.mean(rewards))
@@ -53,17 +57,19 @@ def main():
     if args.train:
         train()
 
+    agent = Agent()
+
     # write the tree enviroment 
     if args.evaluate1:
-        env1 = 'MountainCar-v0'  # insert the string id, enviroment will be created into the agent
+        env1 = agent.env1_id  # insert the string id, enviroment will be created into the agent
         evaluate(render=args.render, env=env1)
 
     if args.evaluate2:
-        env2 = 'LunarLander-v2'
+        env2 = agent.env2_id
         evaluate(render=args.render, env=env2)
 
     if args.evaluate3:
-        env3 = 'CartPole-v0'
+        env3 = agent.env3_id
         evaluate(render=args.render, env=env3)
 
     

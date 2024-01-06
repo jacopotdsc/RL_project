@@ -3,22 +3,23 @@ import torch.nn as nn
 
 def total_loss(agent, actual_policy, old_policy, ADV_err, action, pi_1, k=3):
     kldiv_loss = nn.KLDivLoss(reduction="batchmean")
-    beta = 0.5
-    omega = 2.0
-    omega_12 = 0.25
-    nn.KLDivLoss
-    
-    loss1 = loss_pg(actual_policy[0], pi_1, ADV_err, action)
-    loss2 = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
-    loss3 = loss_casc(kldiv_loss, actual_policy, old_policy, omega, omega_12, k)
-    loss = loss1 + loss2 + loss3
-    #print(f"Total loss value: {loss}\n")
 
+    beta = 0.5
+    omega = 4.0
+    omega_12 = 1
+    
+    value_loss_pg   = loss_pg(actual_policy[0], pi_1, ADV_err, action)
+    value_loss_ppo  = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
+    value_loss_casc = loss_casc(kldiv_loss, actual_policy, old_policy, omega, omega_12, k)
+    loss = value_loss_pg + value_loss_ppo + value_loss_casc
+    #print(f"Total loss value: {loss}\n")
     return loss
 
 
 def loss_pg(actual_policy, pi_1, ADV_err, action):
-    loss = torch.tensor((actual_policy[action]/pi_1[action])*ADV_err, requires_grad=True)
+    loss_tensor = (actual_policy[action] / pi_1[action]) * ADV_err
+    loss_tensor = loss_tensor.clone().detach()
+    loss = loss_tensor.clone().detach().requires_grad_(True)
     #print(f"PG loss value: {loss}")
     return loss
 
