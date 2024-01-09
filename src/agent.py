@@ -16,7 +16,7 @@ class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
                     epsilon = 0.4, epsilon_min = 0.2, epsilon_decay  = 0.99,
-                    learning_rate   = 0.0001 ):
+                    learning_rate   = 0.00001 ):
         
         super(Agent, self).__init__()
 
@@ -167,79 +167,85 @@ class Agent(nn.Module):
 
         return action
 
-    def swtich_enviroment(self, actual_id_env, env_ids, env_done, env_index):
+    def change_gradient_input_layer(self, actual_id_env, set_gradient_value, common_input_layer=True):
+        if actual_id_env == self.env1_id:
+            self.model.set_gradient_layer( self.model.input_env1, set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env2, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env3, not set_gradient_value )
 
-        # support variable: env_index, env_ids, env_done
-        # changed: actual_id_env, actual_env
+        elif actual_id_env == self.env2_id:
+            self.model.set_gradient_layer( self.model.input_env1, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env2, set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env3, not set_gradient_value )
 
-        # actual_id_env: actual id of the enviroment
-        # env_ids: array with all keys ( names ) of enviroment
-        # env_states: actual state of the actual enviroment
-        # env_done: dictionary which contain done-boolean
-        # env_index: general counter
+        elif actual_id_env == self.env3_id:
+            self.model.set_gradient_layer( self.model.input_env1, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env2, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env3, set_gradient_value )
 
-        switched = False
+        if common_input_layer == True:
+            self.model.set_gradient_layer( self.model.input_env1, set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env2, set_gradient_value )
+            self.model.set_gradient_layer( self.model.input_env3, set_gradient_value )
 
-        while not switched:
+    def change_gradient_output_layer(self, actual_id_env, set_gradient_value, everything_disabled=False):
+        if actual_id_env == self.env1_id:
+            self.model.set_gradient_layer( self.model.output_env1, set_gradient_value)
+            self.model.set_gradient_layer( self.model.output_env2, not set_gradient_value)
+            self.model.set_gradient_layer( self.model.output_env3, not set_gradient_value )
+
+        elif actual_id_env == self.env2_id:
+            self.model.set_gradient_layer( self.model.output_env1, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env2, set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env3, not set_gradient_value )
+
+        elif actual_id_env == self.env3_id:
+            self.model.set_gradient_layer( self.model.output_env1, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env2, not set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env3, set_gradient_value )
+
+        if everything_disabled==True:
+            self.model.set_gradient_layer( self.model.output_env1, set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env2, set_gradient_value )
+            self.model.set_gradient_layer( self.model.output_env3, set_gradient_value )
             
-            #print(f"env_index: {env_index}, id:{actual_id_env}, done: {env_done[actual_id_env]}")
-            env_index += 1
-            actual_id_env = env_ids[ env_index % len(env_ids) ]    # env_ids has key for dictionary
-            if env_done[ actual_id_env ] == False:
+    def swtich_enviroment(self, actual_id_env, env_ids, env_index):
 
-                switched = True
-                actual_env = self.env_array[ actual_id_env ]   # picking the state of the enviroment
-                
-                return actual_env, actual_id_env, env_index
+        # disable the input layer related to each enviroemtn and keep the one in common
+        #self.change_gradient_input_layer(actual_id_env, set_gradient_value=False, common_input_layer=False)
 
-    def custom_reset_enviroment(self, id_enviroment, step_ahead = None):
-        # it will reset in a certain state.
-        # it will continue to reset enviroment until it doesn't reach a state at least
-        # steap_ahed steps ahead to the initial state
+        # ensure that all output layer have disabled gradient, enbled the right one after have switched enviromt
+        self.change_gradient_output_layer(actual_id_env, set_gradient_value=False, everything_disabled=True) 
 
-        resetted = False
-        state_returned = None
+        env_index += 1
+        actual_id_env = env_ids[env_index % len(env_ids)] 
+        actual_env    = self.env_array[actual_id_env]
 
-        if self.env1_id == id_enviroment:
-            step_ahead = 40
-        elif self.env2_id == id_enviroment:
-            step_ahead = 10
-        elif self.env3_id == id_enviroment:
-            step_ahead = 3
+        # setting true the right input layer: use gradient=True when common_input_layer=False
+        #self.change_gradient_input_layer(actual_id_env, set_gradient_value=False, common_input_layer=True)
 
-        while not resetted:
-            self.env_array[id_enviroment].reset()
-            action = random.randint(0, self.env_array[id_enviroment].action_space.n -1)
+        # setting true only the layer of the actula_id_env
+        self.change_gradient_output_layer(actual_id_env, set_gradient_value=True, everything_disabled=False) 
 
-            step_counter = 0
-            while step_counter < step_ahead:
-                step_counter += 1
-                state_returned, reward, terminated, truncated, _ = self.env_array[id_enviroment].step(action)
-                done = terminated or truncated 
-
-                #print(f"id_enviroment: {id_enviroment}, done: {done}, step_counter: {step_counter}")
-                if done:
-                    break
-                if step_counter >= step_ahead:
-                    return state_returned, None
+        return actual_env, actual_id_env, env_index 
 
     def train(self):
-       
+        
+        self.model.train()
+        self.model2.train()
+        self.model3.train()
+
         max_epochs = 300 
         self.buffer = Buffer(self, memory_size=5000)
 
         negative_reward_tollerance = 100
 
-        window = 50 
+        window = 30 
         start_time = time.perf_counter()
 
         env_index  = 0 #random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
-        for e in range(max_epochs):
 
-            counter_negative_reward = {  self.env1_id: 0, 
-                                         self.env2_id: 0,
-                                         #self.env3_id: 0
-                                        }
+        for e in range(max_epochs):
 
             # create dictionary for switching easier between states of enviroments
             env_states = {}     # contain state to pass when callicng act
@@ -249,8 +255,6 @@ class Agent(nn.Module):
 
             for env_id in self.env_array.keys():
                 init_state, _ = self.env_array[env_id].reset()
-                #init_state, _ = self.custom_reset_enviroment( env_id )
-
                 env_states[env_id] = init_state
                 env_done[env_id]   = False
                 env_step[env_id]   = 0
@@ -260,21 +264,21 @@ class Agent(nn.Module):
             switch_counter = 0  # plotting purporse
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
-            actual_id_env = env_ids[env_index % len(env_ids) + 1]       # contain id of the actual enviroment
+            actual_id_env = env_ids[env_index % len(env_ids)]       # contain id of the actual enviroment
             actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
 
+            # enabling gradient only for the right output layer
+            #self.change_gradient_input_layer(actual_id_env, set_gradient_value=False, common_input_layer=False)
+            self.change_gradient_output_layer(actual_id_env, set_gradient_value=True, everything_disabled=False) 
+
             done = False    
-            switch_env_frequency = 30
+            switch_env_frequency = 100
 
             print(f"DEBUG: env_ids: {env_ids}, actual_id_env: {actual_id_env}")
             
             if e % switch_env_frequency == 0 and e > 0:
                 print(f"\nold enviroment: {actual_id_env}")
-                #actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
-                env_index += 1
-                actual_id_env = env_ids[env_index % len(env_ids)] 
-                actual_env    = self.env_array[actual_id_env]
-
+                actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_index  )
                 switch_counter += 1
                 print(f"new enviroment: {actual_id_env}")
 
@@ -289,18 +293,6 @@ class Agent(nn.Module):
                 
                 if torch.is_tensor(reward): reward = reward.item()
                 reward = float(reward)
-
-                '''
-                if reward < 0:
-                    counter_negative_reward[actual_id_env] += 1
-                
-                if actual_id_env == self.env1_id and counter_negative_reward[self.env1_id] > 100:
-                    reward = -5.0
-                elif actual_id_env == self.env2_id and counter_negative_reward[self.env2_id] > 40:
-                    reward = -5.0
-                elif actual_id_env == self.env3_id and env_step[self.env3_id] < 15:
-                    reward = 0
-                '''
 
                 env_reward[actual_id_env] += reward
                 env_step[actual_id_env] += 1
@@ -359,7 +351,7 @@ class Agent(nn.Module):
             
             print("Mean Rewards [{}],  Episode reward = [{}],  mean loss = [{}]".format( ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_reward) )), 
                                                                         ', '.join( map(lambda x: '{:.2f}'.format(x),list(env_reward.values()) )), 
-                                                                        ', '.join( map(lambda x: '{:.2f}'.format(x),list(mean_loss) ))
+                                                                        ', '.join( map(lambda x: '{:.3f}'.format(x),list(mean_loss) ))
                                                                                               )
                                                                                               )
             print("lr: {:.5f}, e: {:.3f} \t\t".format( self.learning_rate, self.epsilon))
@@ -387,23 +379,26 @@ class Agent(nn.Module):
         next_qvals = self.model.q_val(next_model_input)  # Q values estimated by the network of next state
         
         # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
-        target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals) )
+        #target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals) )
         
-        #target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
+        #target_qvals = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
         #target_qvals = q_vals.clone().detach()
-        #target_qvals[action] = target_qval
+        #target_qvals[action] = target_qvals
+        #target_qvals = next_qvals #reward + (1 - done)*self.gamma*next_qvals
+        #target_qvals = target_qvals.clone().detach().requires_grad_(True)
+        #print(f"q_val: {q_vals},\nnext_q_val: {next_qvals},\ntarget: {target_qvals}")
+        
 
         if actual_id_env == self.env2_id:
             old_pi = my_model.regression_pi(q_vals)
-            new_pi = my_model.regression_pi(target_qvals)
+            new_pi = my_model.regression_pi(next_qvals)
             #print("called")
         else:
-            old_pi = my_model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
-            new_pi = my_model.pi(target_qvals)
+            old_pi = my_model.log_pi(q_vals) 
+            new_pi = my_model.pi(next_qvals)
 
         pi_1 = self.model.pi(q_vals)# this is the policy which we use to compute the PG Loss, must be computed with Softmax
         
-        #ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
         try: ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
         except: ADV_err = reward + (1 - done)*self.gamma*next_qvals.reshape(-1, 1).item() - q_vals
 
@@ -419,48 +414,42 @@ class Agent(nn.Module):
 
     # how calculate loss
     def calculate_loss(self, state, action, next_state, reward, done, actual_id_env):
-        self.model.optimizer.zero_grad()
+
+        '''
+        in_env1 = self.model.input_env1;    out_env1 = self.model.output_env1
+        in_env2 = self.model.input_env2;    out_env2 = self.model.output_env2
+        in_env3 = self.model.input_env3;    out_env3 = self.model.output_env3
+
+        print("INPUT_ENV1")
+        for param in in_env1.parameters():
+            print(param.requires_grad)
+
+        print("INPUT_ENV2")
+        for param in in_env2.parameters():
+            print(param.requires_grad)
+
+        print("INPUT_ENV3")
+        for param in in_env3.parameters():
+            print(param.requires_grad)
+
+        print("OUTPUT_ENV1")
+        for param in out_env1.parameters():
+            print(param.requires_grad)
         
-        if actual_id_env == self.env1_id:
-            self.model.set_gradient_layer( self.model.input_env2, False )
-            self.model.set_gradient_layer( self.model.output_env2, False )
-            self.model.set_gradient_layer( self.model.input_env3, False )
-            self.model.set_gradient_layer( self.model.output_env3, False )
+        print("OUTPUT_ENV2")
+        for param in out_env2.parameters():
+            print(param.requires_grad)
 
-        elif actual_id_env == self.env2_id:
-            self.model.set_gradient_layer( self.model.input_env1, False )
-            self.model.set_gradient_layer( self.model.output_env1, False )
-            self.model.set_gradient_layer( self.model.input_env3, False )
-            self.model.set_gradient_layer( self.model.output_env3, False )
+        print("OUTPUT_ENV3")
+        for param in out_env3.parameters():
+            print(param.requires_grad)
 
-        elif actual_id_env == self.env3_id:
-            self.model.set_gradient_layer( self.model.input_env1, False )
-            self.model.set_gradient_layer( self.model.output_env1, False )
-            self.model.set_gradient_layer( self.model.input_env2, False )
-            self.model.set_gradient_layer( self.model.output_env2, False )
+        '''
 
         #################### computation of actual policy
         vec_old_pi = []
         vec_new_pi = []
         loss_value = None
-
-        '''
-        batch = self.buffer.sample(actual_id_env)
-        for sample in batch:
-
-            state, action, reward, next_state, done = sample
-
-            old_pi, new_pi, pi_1, ADV_err  = self.calculate_loss_input(self.model,  state, next_state, reward, done, action, actual_id_env, pg_flag = True)
-            old_pi_2, new_pi_2, _, _       = self.calculate_loss_input(self.model2, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
-            old_pi_3, new_pi_3, _, _       = self.calculate_loss_input(self.model3, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
-
-            vec_old_pi.append(old_pi);    vec_old_pi.append(old_pi_2);  vec_old_pi.append(old_pi_3)
-            vec_new_pi.append(new_pi);    vec_new_pi.append(new_pi_2);  vec_new_pi.append(new_pi_3)
-
-            loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1) if loss_value is None else loss_value + total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
-
-        loss_value = loss_value / self.buffer.batch_size
-        '''
 
         old_pi, new_pi, pi_1, ADV_err  = self.calculate_loss_input(self.model,  state, next_state, reward, done, action, actual_id_env, pg_flag = True)
         old_pi_2, new_pi_2, _, _       = self.calculate_loss_input(self.model2, state, next_state, reward, done, action, actual_id_env, pg_flag = False)
@@ -491,10 +480,19 @@ class Agent(nn.Module):
 
         self.training_loss[actual_id_env].append(loss_value)
         
-        loss_value = torch.tensor(loss_value.item(), requires_grad = True)
+        #print(loss_value)
+        #loss_value = torch.tensor(loss_value.item(), requires_grad=True)
         #print(f"loss_value: {loss_value}\n")
 
+        self.model.optimizer.zero_grad()
+        self.model2.optimizer.zero_grad()
+        self.model3.optimizer.zero_grad()
+
         loss_value.backward()
+
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.model2.parameters(), max_norm=5.0)
+        torch.nn.utils.clip_grad_norm_(self.model3.parameters(), max_norm=5.0)
 
         self.model.optimizer.step()
         self.model2.optimizer.step()
@@ -504,27 +502,6 @@ class Agent(nn.Module):
         self.model2.optimizer.zero_grad()
         self.model3.optimizer.zero_grad()
        
-
-
-        if actual_id_env == self.env1_id:
-            self.model.set_gradient_layer( self.model.input_env2, True )
-            self.model.set_gradient_layer( self.model.output_env2, True )
-            self.model.set_gradient_layer( self.model.input_env3, True )
-            self.model.set_gradient_layer( self.model.output_env3, True )
-
-        elif actual_id_env == self.env2_id:
-            self.model.set_gradient_layer( self.model.input_env1, True )
-            self.model.set_gradient_layer( self.model.output_env1, True )
-            self.model.set_gradient_layer( self.model.input_env3, True )
-            self.model.set_gradient_layer( self.model.output_env3, True )
-
-        elif actual_id_env == self.env3_id:
-            self.model.set_gradient_layer( self.model.input_env1, True )
-            self.model.set_gradient_layer( self.model.output_env1, True )
-            self.model.set_gradient_layer( self.model.input_env2, True )
-            self.model.set_gradient_layer( self.model.output_env2, True )
-
-
         return 
 
 

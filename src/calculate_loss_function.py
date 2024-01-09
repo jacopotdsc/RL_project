@@ -22,14 +22,12 @@ def loss_pg(actual_policy, pi_1, ADV_err, action):
 
     try:
         loss_tensor = (actual_policy[action] / pi_1[action]) * ADV_err
-        loss_tensor = loss_tensor.clone().detach()
     except:
         loss_tensor = (actual_policy / pi_1) * ADV_err
-        loss_tensor = loss_tensor.clone().detach()
 
-    loss = loss_tensor.clone().detach().requires_grad_(True)
+    #loss = loss_tensor.clone().detach()#.requires_grad_(True)
     #print(f"PG loss value: {loss.sum()}")
-    return loss.sum()
+    return loss_tensor.sum()
 
 def loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k=3):
     # k -----> set of policies used in Synaptic Consolidation

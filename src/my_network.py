@@ -35,13 +35,20 @@ class Net(nn.Module):
         self.softm   = nn.Softmax(dim=-1)
         self.log_soft = nn.LogSoftmax(dim=-1)
 
-        self.hidden_size = 64
+        # special layer
+        self.hidden_size = 32
+        self.dropout = nn.Dropout(p=0.5)
+        self.bn1 = nn.BatchNorm1d(self.hidden_size)
+        self.bn2 = nn.BatchNorm1d(self.hidden_size)
+        self.ln_input = nn.LayerNorm(self.hidden_size)
+        self.ln1 = nn.LayerNorm(self.hidden_size)
+        self.ln_fin = nn.LayerNorm(self.hidden_size)
 
         # input layers
         self.common_input_layer = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
-        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=self.hidden_size, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=self.hidden_size, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=self.hidden_size, bias=bias)
+        #self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=self.hidden_size, bias=bias)
+        #self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=self.hidden_size, bias=bias)
+        #self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=self.hidden_size, bias=bias)
 
         # hidden layers   
         self.hl1    = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
@@ -52,7 +59,6 @@ class Net(nn.Module):
         self.output_env1 = nn.Linear(in_features=self.hidden_size, out_features=self.env1_outputs, bias=bias)
         self.output_env2 = nn.Linear(in_features=self.hidden_size, out_features=self.env2_outputs, bias=bias)
         self.output_env3 = nn.Linear(in_features=self.hidden_size, out_features=self.env3_outputs, bias=bias)
-
 
         # optimizer -> check how it work values
         self.optimizer = torch.optim.Adam(self.parameters(),lr=learning_rate)
@@ -93,12 +99,17 @@ class Net(nn.Module):
     # return the q-value -> input = ( x, env_id )
     def q_val(self, my_input):
 
+        ###### WARNING ######
+        # If you decide to use 3 different input layer, check about the enabling and disabling gradient correcly 
+
         x = my_input['state']
         env_id = my_input['env_id']
 
         x = preprocess(self, my_input).to(self.device)
-
+        
         x = self.common_input_layer(x)
+        #x = self.ln_input(x)
+        
         '''
         if env_id == self.env1_id:
             x = self.input_env1(x)
@@ -112,11 +123,14 @@ class Net(nn.Module):
 
         x = self.hl1(x)
         x = self.relu(x)
+        #x = self.ln1(x)
+
         x = self.hl_fin(x)
         x = self.relu(x)
+        #x = self.ln_fin(x)
         
         if env_id == self.env1_id:
-            x = self.output_env1(x)
+            x = self.output_env1(x) 
 
         elif env_id == self.env2_id:
             x = self.output_env2(x)
@@ -131,7 +145,7 @@ class Net(nn.Module):
         # layer.paramters is a tensor. It set the gradient to all parameter in one iteration of the loop
         for param in layer.parameters():
             param.requires_grad = gradient_value
-
+            
     # Utility functions
     def save(self, name = 'model.pt' ):
         print("saving weight model")
