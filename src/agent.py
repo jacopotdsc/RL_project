@@ -12,10 +12,6 @@ from my_network import *
 from calculate_loss_function import *
 
 
-###
-# from baselines.common.cmd_util import mujoco_arg_parser, make_mujoco_env
-# "RoboSumo-Ant-vs-Ant-v0"
-#from gym_extensions.continuous import mujoco
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
@@ -43,7 +39,7 @@ class Agent(nn.Module):
         self.action_type_discrete   = 'Discrete'
         self.action_type_continuous = 'Continuous'
 
-        self.env1_id     = 'Acrobot-v1'  #'LunarLander-v2'                                 # https://www.gymlibrary.dev/environments/box2d/lunar_lander/
+        self.env1_id     = 'Acrobot-v1'  #'LunarLander-v2' 
         self.env1        = gym.make(self.env1_id, render_mode=self.render)  # gym.make('HalfCheetah-v2')
         obs1_shape       = self.env1.observation_space.shape
         self.env1_input  = obs1_shape[0] if len(obs1_shape) == 1 else obs1_shape[0]*obs1_shape[1]
@@ -51,31 +47,18 @@ class Agent(nn.Module):
         self.env1_type_a = self.action_type_discrete if type(self.env1.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
         
         
-        self.env2_id     = 'LunarLander-v2' #'Pendulum-v1'#'BipedalWalker-v3'                               # https://www.gymlibrary.dev/environments/box2d/bipedal_walker/
+        self.env2_id     = 'Pendulum-v1' #'BipedalWalker-v3'
         self.env2        = gym.make(self.env2_id, render_mode=self.render)  # gym.make('HumanoidSmallLeg-v0')  
         obs2_shape       = self.env2.observation_space.shape
         self.env2_input  = obs2_shape[0] if len(obs2_shape) == 1 else obs2_shape[0]*obs2_shape[1]
         self.env2_action = self.env2.action_space.n if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.env2.action_space.shape[0]
         self.env2_type_a = self.action_type_discrete if type(self.env2.action_space)== gym.spaces.discrete.Discrete else self.action_type_continuous
-        
-        '''
-        # discretizzazione dell'Action Space se continuous:
-        if not type(self.env2.action_space)== gym.spaces.discrete.Discrete:
-            n_actions = self.env2_action
-            low_value = self.env2.action_space.low
-            high_value = self.env2.action_space.high
-            discrete_actions_env2 = []
-            for i in range(0, n_actions):
-                action = torch.zeros(n_actions)
-                action[i] = torch.tensor(low_value[0])
-                discrete_actions_env2.append(action)
-                action[i] = torch.tensor(high_value[0])
-                discrete_actions_env2.append(action)
-            self.discrete_actions_env2 = discrete_actions_env2
-        '''
-        
-        
-        self.env3_id     = 'CartPole-v1' #'Acrobot-v1'                                     # https://www.gymlibrary.dev/environments/classic_control/acrobot/
+
+        #self.env2_action = self.discretize_action_space()
+        #print(self.env2_action)
+
+        # DO NOT USE ENV 3
+        self.env3_id     = 'CartPole-v1' #'LunarLander-v2'                                    
         self.env3        = gym.make(self.env3_id, render_mode=self.render)  # gym.make('RoboschoolHumanoid-v1')   
         obs3_shape       = self.env3.observation_space.shape
         self.env3_input  = obs3_shape[0] if len(obs3_shape) == 1 else obs3_shape[0]*obs3_shape[1]
@@ -84,46 +67,54 @@ class Agent(nn.Module):
 
         # it contain  actual state for each enviroment
         self.env_array = { self.env1_id: self.env1, 
-                           self.env2_id: self.env2, 
-                           self.env3_id: self.env3 }
+                           self.env2_id: self.env2
+                           #self.env3_id: self.env3
+                             }
 
 
         # Network
         self.encoder = RBFFeatureEncoder(self.env1, self.env2, self.env3)
+
+        env1_input = 6; env1_output = 3
+        env2_input = 3; env2_output = 1
+        env3_input = 8; env3_output = 4
         
-        self.model           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
-                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
-                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
+        self.model           = Net( env1_id=self.env1_id, env1_input=env1_input, env1_outputs=env1_output, 
+                                    env2_id=self.env2_id, env2_input=env2_input, env2_outputs=env2_output,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id, env3_input=env3_input, env3_outputs=env3_output, 
                                     learning_rate=self.learning_rate, encoder = self.encoder).to(self.device) 
-        self.model2           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
-                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
-                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
+        self.model2          = Net( env1_id=self.env1_id, env1_input=env1_input, env1_outputs=env1_output, 
+                                    env2_id=self.env2_id, env2_input=env2_input, env2_outputs=env2_output,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id,  env3_input=env3_input, env3_outputs=env3_output, 
                                     learning_rate=self.learning_rate, encoder = self.encoder).to(self.device)
-        self.model3           = Net( env1_id=self.env1_id, env1_input=2, env1_outputs=3, 
-                                    env2_id=self.env2_id, env2_input=8, env2_outputs=4,#len(self.discrete_actions_env2), 
-                                    env3_id=self.env3_id, env3_input=4, env3_outputs=2, 
+        self.model3          = Net( env1_id=self.env1_id, env1_input=env1_input, env1_outputs=env1_output, 
+                                    env2_id=self.env2_id, env2_input=env2_input, env2_outputs=env2_output,#len(self.discrete_actions_env2), 
+                                    env3_id=self.env3_id, env3_input=env3_input, env3_outputs=env3_output,
                                     learning_rate=self.learning_rate, encoder = self.encoder).to(self.device)
         
 
         self.old_policy = deepcopy(self.model)
         self.old_policy2 = deepcopy(self.model)
-        self.old_policy3 = deepcopy(self.model)
+        #self.old_policy3 = deepcopy(self.model)
         
 
         # for plotting
         self.training_reward = {    self.env1_id: [], 
-                                    self.env2_id: [], 
-                                    self.env3_id: [] }
+                                    self.env2_id: [] 
+                                    #self.env3_id: []
+                                    }
+        
         self.training_loss   = {    self.env1_id: [], 
-                                    self.env2_id: [], 
-                                    self.env3_id: [] }
+                                    self.env2_id: [] 
+                                    #self.env3_id: []
+                                    }
         self.reward_episode  = []
 
         print(self.model)
-        print(f"id -> env1: {self.model.env1_id}, env2: {self.model.env2_id}, env3: {self.model.env3_id}")
+        print(f"id -> env1: {self.model.env1_id}, env2: {self.model.env2_id}") #, env3: {self.model.env3_id}")
         print(f"{self.env1_id}:\t input:{self.env1_input}, output:{self.env1_action}")
         print(f"{self.env2_id}:\t input:{self.env2_input}, output:{self.env2_action}")
-        print(f"{self.env3_id}:\t input:{self.env3_input}, output:{self.env3_action}")
+        #print(f"{self.env3_id}:\t input:{self.env3_input}, output:{self.env3_action}")
         print(f"Device: {self.device}")
 
     def forward(self, x):
@@ -133,47 +124,42 @@ class Agent(nn.Module):
 
         return action
 
+    def discretize_action_space(self):
+        if True:
+            n_actions = 10
+            low_value = self.env2.action_space.low
+            high_value = self.env2.action_space.high
+            discrete_actions_env2 = []
+            for i in range(0, n_actions):
+                action = torch.zeros(n_actions)
+                action[i] = torch.tensor(low_value[0])
+                discrete_actions_env2.append(action)
+                action[i] = torch.tensor(high_value[0])
+                discrete_actions_env2.append(action)
+
+            #self.discrete_actions_env2 = discrete_actions_env2
+            return discrete_actions_env2
+
     def act(self, state, env_id, env_type = None):  
-        
-        '''
-        if env_id == self.env1_id:
-            if self.env1_type_a == self.action_type_discrete:
-                action = random.randint(0, self.env1_action -1 )
-            else:
-                action = np.random.uniform(-1, 1, self.env1_action)
-
-        elif env_id == self.env2_id:
-            if self.env2_type_a == self.action_type_discrete:
-                action = random.randint(0, self.env2_action -1 )
-            else:
-                action = np.random.uniform(-1, 1, self.env2_action)
-
-        elif env_id == self.env3_id:
-            if self.env3_type_a == self.action_type_discrete:
-                action = random.randint(0, self.env3_action -1 )
-            else:
-                action = np.random.uniform(-1, 1, self.env3_action)
-        '''
     
         if np.random.uniform(0,1) < self.epsilon:
             if env_id == self.env1_id:
                 action = random.randint(0, self.env1_action -1 )
 
             elif env_id == self.env2_id:
-                #action = np.random.uniform(-1, 1, self.env2_action)
-                action = random.randint(0, self.env2_action -1 )
+                action = np.random.uniform(-1, 1, self.env2_action)
+                #action = random.randint(0, self.env2_action -1 )
                 
             elif env_id == self.env3_id:
                 action = random.randint(0, self.env3_action -1 )
 
         else:
             model_input = self.model.create_model_input(state, env_id)
-            #action = self.model.forward(model_input)
             action = self.model.q_val(model_input)
 
             if env_id == self.env2_id:
-                #action = action.detach().cpu()
-                action = torch.argmax(action).item()
+                action = action.detach().cpu()
+                #action = torch.argmax(action).item()
             else:
                 action = torch.argmax(action).item()
 
@@ -251,8 +237,9 @@ class Agent(nn.Module):
         for e in range(max_epochs):
 
             counter_negative_reward = {  self.env1_id: 0, 
-                                         self.env2_id: 0, 
-                                         self.env3_id: 0 }
+                                         self.env2_id: 0,
+                                         #self.env3_id: 0
+                                        }
 
             # create dictionary for switching easier between states of enviroments
             env_states = {}     # contain state to pass when callicng act
@@ -273,16 +260,21 @@ class Agent(nn.Module):
             switch_counter = 0  # plotting purporse
 
             env_ids       = list(self.env_array.keys())  # contain id of all enviroment
-            actual_id_env = env_ids[env_index % len(env_ids)]       # contain id of the actual enviroment
+            actual_id_env = env_ids[env_index % len(env_ids) + 1]       # contain id of the actual enviroment
             actual_env    = self.env_array[actual_id_env]  # contain the state of the selected enviroment accordin to id
 
             done = False    
-            switch_env_frequency = 100
+            switch_env_frequency = 30
 
-
+            print(f"DEBUG: env_ids: {env_ids}, actual_id_env: {actual_id_env}")
+            
             if e % switch_env_frequency == 0 and e > 0:
                 print(f"\nold enviroment: {actual_id_env}")
-                actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
+                #actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_done, env_index  )
+                env_index += 1
+                actual_id_env = env_ids[env_index % len(env_ids)] 
+                actual_env    = self.env_array[actual_id_env]
+
                 switch_counter += 1
                 print(f"new enviroment: {actual_id_env}")
 
@@ -290,7 +282,7 @@ class Agent(nn.Module):
 
                 state = env_states[ actual_id_env ]
                 action = self.act(state, actual_id_env) 
-                
+
                 next_state, reward, terminated, truncated, _ = actual_env.step(action)
                 env_states[ actual_id_env ] = next_state
                 done = terminated or truncated  # truncated if fail to stand up -> penalize!
@@ -379,10 +371,9 @@ class Agent(nn.Module):
             print("Elapsed time: {:.2f} minutes".format(elapsed_time/60))
             print()
 
-            self.model.save('training_progress_total_loss.pt')
+            self.model.save('training_model.pt')
 
-        self.model.save('model_train_finished_total_loss.pt')
-
+        self.model.save('model.pt')
 
     def calculate_loss_input(self, my_model, state, next_state, reward, done, action, actual_id_env, pg_flag = False):
 
@@ -395,14 +386,31 @@ class Agent(nn.Module):
         next_model_input = my_model.create_model_input(next_state, actual_id_env)
         next_qvals = self.model.q_val(next_model_input)  # Q values estimated by the network of next state
         
-         # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
+        # Q values computed by the network with experience, "OBSERVATED EXPERIENCE"
         target_qvals = reward*torch.ones( len(next_qvals) ) + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()*torch.ones( len(next_qvals) )
         
-        old_pi = my_model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
-        new_pi = my_model.pi(target_qvals)
+        #target_qval = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item()
+        #target_qvals = q_vals.clone().detach()
+        #target_qvals[action] = target_qval
+
+        if actual_id_env == self.env2_id:
+            old_pi = my_model.regression_pi(q_vals)
+            new_pi = my_model.regression_pi(target_qvals)
+            #print("called")
+        else:
+            old_pi = my_model.log_pi(q_vals)# the output predicted by the model must be computed with logSoftmax
+            new_pi = my_model.pi(target_qvals)
 
         pi_1 = self.model.pi(q_vals)# this is the policy which we use to compute the PG Loss, must be computed with Softmax
-        ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
+        
+        #ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
+        try: ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
+        except: ADV_err = reward + (1 - done)*self.gamma*next_qvals.reshape(-1, 1).item() - q_vals
+
+        old_pi  = old_pi.to(self.device)
+        new_pi  = new_pi.to(self.device)
+        pi_1    = pi_1.to(self.device)
+        ADV_err = ADV_err.to(self.device)
 
         if pg_flag == True:
             return old_pi, new_pi, pi_1, ADV_err

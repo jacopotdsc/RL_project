@@ -1,7 +1,10 @@
+from importlib.metadata import requires
 import torch
 import torch.nn as nn
 import numpy as np
 from utils import *
+from scipy.stats import norm
+
 
 class Net(nn.Module):
     def __init__(self,  env1_id, env1_input, env1_outputs, 
@@ -35,9 +38,10 @@ class Net(nn.Module):
         self.hidden_size = 64
 
         # input layers
-        self.input_env1 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
-        self.input_env2 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
-        self.input_env3 = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
+        self.common_input_layer = nn.Linear(in_features=self.encoder.size, out_features=self.hidden_size, bias=bias)
+        self.input_env1 = nn.Linear(in_features=self.env1_input, out_features=self.hidden_size, bias=bias)
+        self.input_env2 = nn.Linear(in_features=self.env2_input, out_features=self.hidden_size, bias=bias)
+        self.input_env3 = nn.Linear(in_features=self.env3_input, out_features=self.hidden_size, bias=bias)
 
         # hidden layers   
         self.hl1    = nn.Linear(in_features=self.hidden_size, out_features=self.hidden_size, bias=bias) 
@@ -53,6 +57,8 @@ class Net(nn.Module):
         # optimizer -> check how it work values
         self.optimizer = torch.optim.Adam(self.parameters(),lr=learning_rate)
 
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     def create_model_input(self, state, env_id):
          return {'state':state, 'env_id': env_id}
     
@@ -62,11 +68,10 @@ class Net(nn.Module):
         q_val = self.q_val(x)
 
         # implement dinamic choice with env_type in agent
-        if x['env_id'] == self.env2_id:
-            probs = self.softm(q_val)
-        else:
-            probs = self.softm(q_val)
-
+        #if x['env_id'] == self.env2_id:probs = self.softm(q_val)
+        #else: probs = self.softm(q_val)
+        probs = self.softm(q_val)
+        
         return probs
 
     def log_pi(self, q_val):
@@ -77,14 +82,24 @@ class Net(nn.Module):
         probs = self.softm(q_val)
         return probs
 
+    def regression_pi(self, q_val):
+        sigma = 0.5
+        range = np.linspace(-2, 2, 100)
+        q_val = q_val.detach().cpu().numpy()
+        probs = norm.pdf(range, q_val, sigma)
+
+        return torch.tensor(probs, device=self.device, requires_grad = True)
+
     # return the q-value -> input = ( x, env_id )
     def q_val(self, my_input):
 
         x = my_input['state']
         env_id = my_input['env_id']
 
-        x = preprocess(self, my_input)
+        x = preprocess(self, my_input).to(self.device)
 
+        x = self.common_input_layer(x)
+        '''
         if env_id == self.env1_id:
             x = self.input_env1(x)
 
@@ -93,7 +108,8 @@ class Net(nn.Module):
 
         elif env_id == self.env3_id :
             x = self.input_env3(x)
-        
+        '''
+
         x = self.hl1(x)
         x = self.relu(x)
         x = self.hl_fin(x)
@@ -104,7 +120,6 @@ class Net(nn.Module):
 
         elif env_id == self.env2_id:
             x = self.output_env2(x)
-            #x = torch.clamp(x, min=-2.0, max=2.0)
 
         elif env_id == self.env3_id :
             x = self.output_env3(x)

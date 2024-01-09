@@ -57,7 +57,6 @@ class Buffer:
         elif env_id == self.agent.env3_id: 
              return len(self.buffer_env3)
 
-
 class RBFFeatureEncoder:
     def __init__(self, env1, env2, env3, n_component=100): 
 
@@ -118,7 +117,7 @@ def preprocess(model, model_input):
 
     #return torch.tensor(model_input['state'])
     state = model.encoder.encode(model, model_input)
-
+    
     return state.clone().detach()
 
 def plot_training_rewards(agent):

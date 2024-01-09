@@ -11,20 +11,25 @@ def total_loss(agent, actual_policy, old_policy, ADV_err, action, pi_1, k=3):
     value_loss_pg   = loss_pg(actual_policy[0], pi_1, ADV_err, action)
     value_loss_ppo  = loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k)
     value_loss_casc = loss_casc(kldiv_loss, actual_policy, old_policy, omega, omega_12, k)
-    #loss = value_loss_pg + value_loss_ppo + value_loss_casc
+    loss = value_loss_pg + value_loss_ppo + value_loss_casc
     #print(f"Total loss value: {loss}\n")
 
-    loss = value_loss_ppo
+    #loss = value_loss_ppo
     return loss
 
 
 def loss_pg(actual_policy, pi_1, ADV_err, action):
-    loss_tensor = (actual_policy[action] / pi_1[action]) * ADV_err
-    loss_tensor = loss_tensor.clone().detach()
+
+    try:
+        loss_tensor = (actual_policy[action] / pi_1[action]) * ADV_err
+        loss_tensor = loss_tensor.clone().detach()
+    except:
+        loss_tensor = (actual_policy / pi_1) * ADV_err
+        loss_tensor = loss_tensor.clone().detach()
 
     loss = loss_tensor.clone().detach().requires_grad_(True)
-    #print(f"PG loss value: {loss}")
-    return loss
+    #print(f"PG loss value: {loss.sum()}")
+    return loss.sum()
 
 def loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k=3):
     # k -----> set of policies used in Synaptic Consolidation
@@ -34,6 +39,7 @@ def loss_ppo(kldiv_loss, actual_policy, old_policy, beta, omega, k=3):
 
     for i in range(0, k):
         loss += -beta*(omega**(i))*kldiv_loss(old_policy[i], actual_policy[i]) 
+        #print(f"old: {old_policy[i]}, new: {actual_policy[i]}")
     # KLDiv(output of model, observated experience) ---> the output of the model must be computed with logSoftmax, not Softmax
     
     #print(f"PPO loss value: {loss}, kldiv: {kldiv_loss(old_policy[i], actual_policy[i]) }\nactual_policy: {actual_policy}, old_policy: {old_policy}\n")
