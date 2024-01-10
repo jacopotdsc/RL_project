@@ -1,3 +1,4 @@
+from calendar import c
 import gymnasium as gym
 import torch
 import torch.nn as nn
@@ -15,8 +16,8 @@ from calculate_loss_function import *
 class Agent(nn.Module):
 
     def __init__(   self, env = None, gamma = 0.95, 
-                    epsilon = 0.4, epsilon_min = 0.2, epsilon_decay  = 0.99,
-                    learning_rate   = 0.00001 ):
+                    epsilon = 0.4, epsilon_min = 0.3, epsilon_decay  = 0.9,
+                    learning_rate   = 0.0001 ):
         
         super(Agent, self).__init__()
 
@@ -24,6 +25,7 @@ class Agent(nn.Module):
 
         # hyperparameters
         self.gamma           = gamma
+        self.start_epsilon   = epsilon     
         self.epsilon         = epsilon
         self.epsilon_min     = epsilon_min
         self.epsilon_decay   = epsilon_decay
@@ -31,6 +33,8 @@ class Agent(nn.Module):
         # loss functions
         self.learning_rate   = learning_rate
         self.mse_loss        = nn.MSELoss()
+        self.copy_counter    = 0
+        self.copy_frequency  = 10
 
         # list of enviroment needed for training
         self.evaluation_env = env # used during evaluation: it contian the id of the enviroment ( maybe do a gym.make(env) )
@@ -236,11 +240,12 @@ class Agent(nn.Module):
         self.model3.train()
 
         max_epochs = 300 
+        max_steps = 200
         self.buffer = Buffer(self, memory_size=5000)
 
         negative_reward_tollerance = 100
 
-        window = 30 
+        window = 15 
         start_time = time.perf_counter()
 
         env_index  = 0 #random.randint(0,len(self.env_array.keys()) - 1)      # used for switch
@@ -280,6 +285,7 @@ class Agent(nn.Module):
                 print(f"\nold enviroment: {actual_id_env}")
                 actual_env, actual_id_env, env_index = self.swtich_enviroment( actual_id_env, env_ids, env_index  )
                 switch_counter += 1
+                self.epsilon = self.start_epsilon
                 print(f"new enviroment: {actual_id_env}")
 
             while True:
@@ -302,6 +308,9 @@ class Agent(nn.Module):
                 #    self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
                 self.calculate_loss(state, action, next_state, reward, done, actual_id_env)
 
+                if env_step[actual_id_env] >= max_steps:
+                    done = True
+
                 # plot statstics
                 if done:
 
@@ -315,8 +324,8 @@ class Agent(nn.Module):
 
                     #self.epsilon *= self.epsilon_decay
 
-                    #if self.epsilon < self.epsilon_min:
-                        #self.epsilon = self.epsilon_min
+                    if self.epsilon < self.epsilon_min:
+                        self.epsilon = self.epsilon_min
 
                     if done:
                         break
@@ -390,7 +399,7 @@ class Agent(nn.Module):
         
 
         if actual_id_env == self.env2_id:
-            old_pi = my_model.regression_pi(q_vals)
+            old_pi = my_model.regression_log_pi(q_vals)
             new_pi = my_model.regression_pi(next_qvals)
             #print("called")
         else:
@@ -402,10 +411,10 @@ class Agent(nn.Module):
         try: ADV_err = reward + (1 - done)*self.gamma*torch.max(next_qvals, dim=-1)[0].reshape(-1, 1).item() - q_vals[action]
         except: ADV_err = reward + (1 - done)*self.gamma*next_qvals.reshape(-1, 1).item() - q_vals
 
-        old_pi  = old_pi.to(self.device)
+        old_pi  = old_pi.to(self.device).detach()
         new_pi  = new_pi.to(self.device)
         pi_1    = pi_1.to(self.device)
-        ADV_err = ADV_err.to(self.device)
+        ADV_err = ADV_err.to(self.device).detach()
 
         if pg_flag == True:
             return old_pi, new_pi, pi_1, ADV_err
@@ -460,22 +469,24 @@ class Agent(nn.Module):
 
         loss_value = total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1) if loss_value is None else loss_value + total_loss(self, vec_new_pi, vec_old_pi, ADV_err, action, pi_1)
 
+        self.copy_counter += 1
 
         # keeping the record of my policies
-        self.old_policy  = deepcopy(self.model)
-        self.old_policy2 = deepcopy(self.model2)
-        self.old_policy3 = deepcopy(self.model3)
+        if True: #self.copy_counter % self.copy_frequency == 0:
+            self.old_policy  = deepcopy(self.model)
+            self.old_policy2 = deepcopy(self.model2)
+            self.old_policy3 = deepcopy(self.model3)
 
-        for param in self.old_policy.parameters():
-            param.requires_grad = False
-        for param in self.old_policy2.parameters():
-            param.requires_grad = False
-        for param in self.old_policy3.parameters():
-            param.requires_grad = False
+            for param in self.old_policy.parameters():
+                param.requires_grad = False
+            for param in self.old_policy2.parameters():
+                param.requires_grad = False
+            for param in self.old_policy3.parameters():
+                param.requires_grad = False
 
-        self.old_policy.optimizer = None
-        self.old_policy2.optimizer = None
-        self.old_policy3.optimizer = None
+            self.old_policy.optimizer = None
+            self.old_policy2.optimizer = None
+            self.old_policy3.optimizer = None
         
 
         self.training_loss[actual_id_env].append(loss_value)

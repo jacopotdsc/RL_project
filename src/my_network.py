@@ -81,20 +81,38 @@ class Net(nn.Module):
         return probs
 
     def log_pi(self, q_val):
+        #print(f"log before prob: {q_val}")
         probs = self.log_soft(q_val)
+        #print(f"log prob: {probs}")
         return probs
     
     def pi(self, q_val):
+        #print(f"before prob: {q_val}")
         probs = self.softm(q_val)
+        #print(f"probs: {probs}\n")
         return probs
 
     def regression_pi(self, q_val):
         sigma = 0.5
         range = np.linspace(-2, 2, 100)
         q_val = q_val.detach().cpu().numpy()
-        probs = norm.pdf(range, q_val, sigma)
+        probs = norm.pdf(range, q_val, sigma).mean()
 
-        return torch.tensor(probs, device=self.device, requires_grad = True)
+        probs /= probs.sum()
+        probs = torch.tensor(probs, device=self.device) #, requires_grad = True)
+
+        return probs
+
+    def regression_log_pi(self, q_val):
+        sigma = 0.5
+        range = np.linspace(-2, 2, 100)
+        q_val = q_val.detach().cpu().numpy()
+        probs = norm.pdf(range, q_val, sigma).mean()
+
+        probs /= probs.sum()
+        probs =  torch.tensor(probs, device=self.device) #, requires_grad = True)
+        probs = torch.log(probs)
+        return probs
 
     # return the q-value -> input = ( x, env_id )
     def q_val(self, my_input):
